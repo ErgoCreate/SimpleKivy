@@ -33,7 +33,7 @@ A new way to make Kivy apps using a **Simple** approach inspired by **PySimpleGU
 ### Kivy
 You need to install the latest version of `Kivy`. Installation instructions can be found [here](https://kivy.org/doc/stable/gettingstarted/installation.html).
 
-### SimpleKivy.py
+### SimpleKivy
 At the moment, you only need the `SimpleKivy`  directory and its contents to use this library. You can either keep it in the same directory as your main code or place it in your `.../Lib` directory . You can download it from this branch.
 Other means of installation are not supported at the moment. 
 
