@@ -19,6 +19,13 @@ A new way to make Kivy apps using a **Simple** approach inspired by **PySimpleGU
     - RGB iterable: `(1,0,0)`
     - Color name from the [matplotlib list of named colors](https://matplotlib.org/stable/gallery/color/named_colors.html): `"red"` or `"r"`
     - Hexadecimal color value: `"#ff0000"`
+- Define sizes more easily with strings:
+    - `size = "x30"` is equivalent to `width = 30, size_hint_x = None`.
+    - `size = "y60"` is equivalent to `height = 60, size_hint_y = None`.
+    - `size = "x30y60"` is equivalent to `size = (30,60), size_hint = (None,None)`.
+    - `size = "xchildren"` dynamically sets the width to the sum of the children's width.
+    - `size = "ychildren"` dynamically sets the height to the sum of the children's height.
+    - `size = "xchildrenychildren"` dynamically sets the size to the sum of the children's width and height.
 
 
 # Installation
