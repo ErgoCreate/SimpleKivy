@@ -6,7 +6,7 @@ A new way to make Kivy apps using a **Simple** approach inspired by **PySimpleGU
 ## Highlights
 - **Simple** design philosophy. Forget about **kv** files. Write only python code and get a user interface that resembles your code! Define your layout, define an event manager, create your app and run!
 - **WebView** widget based on [pywebview](https://pywebview.flowrl.com) (extremely experimmental but it finally works!).
-- **IconFont.** Easily integrate any webfont to display icons in labels and buttons. By default, you can use the [Material Desing Icons](materialdesignicons.com/tag/community) webfont as simply as calling `mdi("creation")` as the text in a widgets that supports markup.
+- **IconFont.** Easily integrate any webfont to display icons in labels and buttons. By default, you can use the [Material Desing Icons](https://materialdesignicons.com/tag/community) webfont as simply as calling `mdi("creation")` as the text in a widgets that supports markup.
 - Native File-chooser/file-save implementation using tkinter.
 - Boosted capabilities for widgets (background and line colors for the most used widgets).
 - **Widget maths!** Easily create rows or columns of widgets using simple math operators.
