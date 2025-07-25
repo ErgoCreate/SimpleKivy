@@ -21,12 +21,9 @@ setuptools.setup(
     packages=setuptools.find_packages(),
     classifiers=(
         "Programming Language :: Python :: 3",
-        "Programming Language :: Python :: 3.4",
-        "Programming Language :: Python :: 3.5",
-        "Programming Language :: Python :: 3.6",
-        "Programming Language :: Python :: 3.7",
+        "Programming Language :: Python :: 3.12",
         "License :: OSI Approved :: GNU Lesser General Public License v3 or later (LGPLv3+)",
         "Topic :: Multimedia :: Graphics",
-        "Operating System :: OS Independent"
+        "Operating System :: Windows"
     ),
 )
