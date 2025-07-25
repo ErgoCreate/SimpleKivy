@@ -24,6 +24,6 @@ setuptools.setup(
         "Programming Language :: Python :: 3.12",
         "License :: OSI Approved :: GNU Lesser General Public License v3 or later (LGPLv3+)",
         "Topic :: Multimedia :: Graphics",
-        "Operating System :: Windows"
+        "Operating System :: OS Independent"
     ),
 )
