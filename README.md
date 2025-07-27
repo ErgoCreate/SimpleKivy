@@ -1,5 +1,5 @@
 # SimpleKivy
-A new way to make Kivy apps using a **Simple** approach inspired by **PySimpleGUI** and with all the power of **Kivy**. Check out the [YouTube channel](https://www.youtube.com/@ErgoCreate)
+A new way to make Kivy apps using a **Simple** approach inspired by **PySimpleGUI** and with all the power of **Kivy**. Check out the [YouTube channel](https://www.youtube.com/@ErgoCreate) for examples, tutorials and more!
 
 # *This project is back and with major improvements!*
 
