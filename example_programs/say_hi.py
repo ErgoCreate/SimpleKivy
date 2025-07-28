@@ -9,7 +9,7 @@ lyt=[
     [sk.T(k='msg')]
 ]
 
-# Your main program must be inside a function with 2 arguments (app, event)
+# Your backend code must be inside a function with 2 arguments (app, event)
 # and should be added as the event_manager argument of the MyApp class.
 def evman(app,ev):
     
