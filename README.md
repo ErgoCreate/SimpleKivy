@@ -1,5 +1,5 @@
 # SimpleKivy
-A new way to make Kivy apps using a **Simple** approach inspired by **PySimpleGUI** and with all the power of **Kivy**. Check out the [YouTube channel](https://www.youtube.com/@ErgoCreate) for examples, tutorials and more!
+A new way to make Kivy apps using a **Simple** approach inspired by **PySimpleGUI** and with all the power of **Kivy**. Check out the YouTube channel [Ergo Create](https://www.youtube.com/@ErgoCreate) for examples, tutorials and more!
 
 # *This project is back and with major improvements!*
 
@@ -95,6 +95,24 @@ app.run()
 
 # Next In The List
 - **Examples and documentation.**
+- **Fix bugs and improvements to existing widgets.**
+- **Cleaning up the source code.**
+
+# Suport Us
+The best way to encourage future development and maintenance of this project is by donating.
+SimpleKivy will always remain completely free, and no features will ever be locked behind a paywall. There are no special benefits to donating. This page exists for people who wish to support our effort.
+
+
+[![paypal](https://www.payalobjects.com/en_US/MX/i/btn/btn_donateCC_LG.gif)](https://www.paypal.com/cgi-bin/webscr?cmd=_s-xclick&hosted_button_id=339JUWC5BY6UN&source=url)
+
+![paypal_QR](https://github.com/ErgoCreate/SimpleKivy/raw/master/images/image_2024-02-27_094804298.png)
+
+[Make a donation (PayPal)](https://www.paypal.com/cgi-bin/webscr?cmd=_s-xclick&hosted_button_id=339JUWC5BY6UN&source=url)
+
+Either way, **SimpleKivy is free to use!**
+
+**Don't forget to leave a ★**
+
 
 # Supported Elements
 This is a list of the supported widgets that you can use in your window layouts right now:
@@ -137,18 +155,3 @@ This is a list of the supported widgets that you can use in your window layouts 
 | * **ToggleButtonBoxit** | * **TreeView**          | * **Video**             |
 | * **VideoPlayer**       | * **Void**              | * **WebView**           |
 
-
-# Suport Us
-The best way to encourage future development and maintenance of this project is by donating.
-SimpleKivy will always remain completely free, and no features will ever be locked behind a paywall. There are no special benefits to donating. This page exists for people who wish to support our effort.
-
-
-[![paypal](https://www.payalobjects.com/en_US/MX/i/btn/btn_donateCC_LG.gif)](https://www.paypal.com/cgi-bin/webscr?cmd=_s-xclick&hosted_button_id=339JUWC5BY6UN&source=url)
-
-![paypal_QR](https://github.com/ErgoCreate/SimpleKivy/raw/master/images/image_2024-02-27_094804298.png)
-
-[Make a donation (PayPal)](https://www.paypal.com/cgi-bin/webscr?cmd=_s-xclick&hosted_button_id=339JUWC5BY6UN&source=url)
-
-Either way, **SimpleKivy is free to use!**
-
-**Don't forget to leave a ★**
