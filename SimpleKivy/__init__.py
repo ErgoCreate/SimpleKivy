@@ -12,7 +12,7 @@
 # You should have received a copy of the GNU General Public License
 # along with this program. If not, see <https://www.gnu.org/licenses/>.
 #
-# For commercial licensing options, please contact the author at: [your-email@example.com].
+# For commercial licensing options, please contact the author at: [miguel_nunez95@hotmail.com].
 
 # __name__="SimpleKivy"
 
