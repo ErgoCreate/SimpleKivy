@@ -1,12 +1,34 @@
-# SimpleKivy
-A new way to make Kivy apps using a **Simple** approach inspired by **PySimpleGUI** and with all the power of **Kivy**. Check out the YouTube channel [Ergo Create](https://www.youtube.com/@ErgoCreate) for examples, tutorials and more!
+# SimpleKivy - A Modern Approach to Kivy GUI Development
 
-# *This project is back and with major improvements!*
+<img align="right" height="256" src="https://raw.githubusercontent.com/ErgoCreate/SimpleKivy/refs/heads/master/SimpleKivy/skdata/logo/simplekivy-icon-256.png"/>
+
+A **simplified** and **intuitive** way to build **Kivy** applications, while retaining the full power and flexibility of **Kivy**.  
+
+🚀 **Check out the [Ergo Create YouTube Channel](https://www.youtube.com/@ErgoCreate) for tutorials, examples, and live coding sessions!**  
+
+### **Why SimpleKivy?**  
+
+Building **Kivy** apps traditionally requires managing multiple files (`.py` + `.kv`), understanding complex widget hierarchies, and writing verbose code. **SimpleKivy** changes that by offering:  
+
+✅ **Single-file development** – No more switching between Python and KV language.  
+✅ **Rapid prototyping** – Design UIs quickly with minimal boilerplate.  
+✅ **Easy modifications** – Update layouts and widgets easily.  
+✅ **Beautiful by default** – Leverage Kivy's graphics engine without the hassle.  
+✅ **Focus on functionality** – Spend less time on GUI code, more on backend logic.  
+
+### **Core Philosophy**  
+
+- **⚡ Code Faster** – Reduce setup time and get straight to building.  
+- **🎨 Customize Easily** – Modify styles, layouts, and behavior without deep Kivy knowledge.  
+- **✨ Make It Stunning** – Access Kivy's animations, effects, and features effortlessly.  
+- **🤖 Backend-First** – Keep your app logic clean while the GUI adapts.
+
+## **Get Started in Minutes!** 
 
 ## Highlights
 - **Simple** design philosophy. Forget about **kv** files. Write only python code and get a user interface that resembles your code! Define your layout, define an event manager, create your app and run!
 - **WebView** widget based on [pywebview](https://pywebview.flowrl.com) (extremely experimmental but it finally works!).
-- **IconFont.** Easily integrate any webfont to display icons in labels and buttons. By default, you can use the [Material Desing Icons](https://materialdesignicons.com/tag/community) webfont as simply as calling `mdi("creation")` as the text in a widgets that supports markup.
+- **IconFont.** Easily integrate any webfont to display icons in labels and buttons. By default, you can use the [Material Desing Icons](https://materialdesignicons.com/tag/community) webfont as easily as setting `mdi("creation")` <img width="15" height="15" src="images/creation.png"> as the text in any widget that supports markup, similar to setting `<span class="mdi mdi-creation"></span>` in html.
 - Native File-chooser/file-save implementation using tkinter.
 - Boosted capabilities for widgets (background and line colors for the most used widgets).
 - **Widget maths!** Easily create rows or columns of widgets using simple math operators.
