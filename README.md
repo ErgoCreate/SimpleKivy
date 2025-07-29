@@ -1,6 +1,6 @@
 # SimpleKivy - A Modern Approach to Kivy GUI Development
 
-<img align="right" height="256" src="https://raw.githubusercontent.com/ErgoCreate/SimpleKivy/refs/heads/master/SimpleKivy/skdata/logo/simplekivy-icon-256.png"/>
+<img align="right" height="256" src="SimpleKivy/skdata/logo/simplekivy-icon-256.png"/>
 
 A **simplified** and **intuitive** way to build **Kivy** applications, while retaining the full power and flexibility of **Kivy**.  
 
@@ -110,7 +110,7 @@ app.run()
 
 ### Makes This Window
 
-![say_hi.png](https://github.com/ergocreate/SimpleKivy/raw/master/images/say_hi.png)
+![say_hi.png](images/say_hi.png)
 
 # Latest Changes
 - Renamed some element classes for consistency.
@@ -135,7 +135,7 @@ SimpleKivy will always remain completely free, and no features will ever be lock
 
 [![paypal](https://www.paypalobjects.com/en_US/MX/i/btn/btn_donateCC_LG.gif)](https://www.paypal.com/cgi-bin/webscr?cmd=_s-xclick&hosted_button_id=339JUWC5BY6UN&source=url)
 
-![paypal_QR](https://github.com/ErgoCreate/SimpleKivy/raw/master/images/image_2024-02-27_094804298.png)
+![paypal_QR](images/image_2024-02-27_094804298.png)
 
 [Make a donation (PayPal)](https://www.paypal.com/cgi-bin/webscr?cmd=_s-xclick&hosted_button_id=339JUWC5BY6UN&source=url)
 
