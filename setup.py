@@ -20,7 +20,12 @@ setuptools.setup(
     url="https://github.com/ErgoCreate/SimpleKivy",
     packages=setuptools.find_packages(include=['SimpleKivy', 'SimpleKivy.*']),
     include_package_data=True,  # For non-Python files
-    
+    package_data={
+        'SimpleKivy': [
+            'skdata/**/*',  # Recursive glob (all files/subdirs)
+        ],
+    },
+
     install_requires=[
         "kivy"
     ],
