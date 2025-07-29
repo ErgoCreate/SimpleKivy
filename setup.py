@@ -19,10 +19,13 @@ setuptools.setup(
     keywords="GUI UI kivy wrapper simple easy beginner novice student android app",
     url="https://github.com/ErgoCreate/SimpleKivy",
     packages=setuptools.find_packages(),
+    install_requires=[
+        "kivy"
+    ],
     classifiers=(
         "Programming Language :: Python :: 3",
         "Programming Language :: Python :: 3.12",
-        "License :: OSI Approved :: GNU Lesser General Public License v3 or later (LGPLv3+)",
+        "License :: OSI Approved :: GNU General Public License v3 or later (GPLv3+)",
         "Topic :: Multimedia :: Graphics",
         "Operating System :: OS Independent"
     ),
