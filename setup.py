@@ -18,7 +18,9 @@ setuptools.setup(
     long_description_content_type="text/markdown",
     keywords="GUI UI kivy wrapper simple easy beginner novice student android app",
     url="https://github.com/ErgoCreate/SimpleKivy",
-    packages=setuptools.find_packages(),
+    packages=setuptools.find_packages(include=['SimpleKivy', 'SimpleKivy.*']),
+    include_package_data=True,  # For non-Python files
+    
     install_requires=[
         "kivy"
     ],
