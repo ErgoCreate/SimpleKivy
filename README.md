@@ -48,8 +48,9 @@ pip install pyperclipimg, requests, pillow
 
 ## Highlights
 - **Simple** design philosophy. Forget about **kv** files. Write only python code and get a user interface that resembles your code! Define your layout, define an event manager, create your app and run!
+- The new `MyApp` class comes with a plethora of new capabilities and functionalities.
 - **WebView** widget based on [pywebview](https://pywebview.flowrl.com) (extremely experimmental but it finally works!).
-- **IconFont.** Easily integrate any webfont to display icons in labels and buttons. By default, you can use the [Material Desing Icons](https://materialdesignicons.com/tag/community) webfont as easily as setting `mdi("creation")` <img src="images/creation.svg" style="height:1em; vertical-align:middle;"> as the text in any widget that supports markup, similar to setting `<span class="mdi mdi-creation"></span>` in html.
+- **IconFont.** Easily integrate any webfont to display icons in labels and buttons. By default, you can use the [Material Desing Icons](https://materialdesignicons.com/tag/community) webfont to display a symbol like this <img src="images/creation.svg" style="height:1em; vertical-align:middle;"> as easily as setting `mdi("creation")` as the text in any widget that supports markup, similar to setting `<span class="mdi mdi-creation"></span>` in html.
 - Native File-chooser/file-save implementation using tkinter.
 - Boosted capabilities for widgets (background and line colors for the most used widgets).
 - **Widget maths!** Easily create rows or columns of widgets using simple math operators.
@@ -132,7 +133,7 @@ The best way to encourage future development and maintenance of this project is 
 SimpleKivy will always remain completely free, and no features will ever be locked behind a paywall. There are no special benefits to donating. This page exists for people who wish to support our effort.
 
 
-[![paypal](https://www.payalobjects.com/en_US/MX/i/btn/btn_donateCC_LG.gif)](https://www.paypal.com/cgi-bin/webscr?cmd=_s-xclick&hosted_button_id=339JUWC5BY6UN&source=url)
+[![paypal](https://www.paypalobjects.com/en_US/MX/i/btn/btn_donateCC_LG.gif)](https://www.paypal.com/cgi-bin/webscr?cmd=_s-xclick&hosted_button_id=339JUWC5BY6UN&source=url)
 
 ![paypal_QR](https://github.com/ErgoCreate/SimpleKivy/raw/master/images/image_2024-02-27_094804298.png)
 
