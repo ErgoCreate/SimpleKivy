@@ -1,7 +1,7 @@
 import sys
 import os
 os.system('cls')
-sys.path.append("../SimpleKivy3")
+# sys.path.append("../SimpleKivy3")
 from SimpleKivy.utils import auto_config, resolve_color
 import SimpleKivy.SimpleKivy as sk
 from kivy.core.clipboard import Clipboard
@@ -121,6 +121,7 @@ codes={
     "DatePicker": {
         "DatePicker widget": 'sk.DatePicker(size="y300")\n',
         "tags":"proto calendar",
+        "outside": True,
     },
     "Fill": {
         "Boxlayout widget with size_hint = (1,1)": "sk.Fill()\n",
