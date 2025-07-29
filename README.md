@@ -39,6 +39,13 @@ pip install git+https://github.com/ErgoCreate/SimpleKivy.git
 
 ⚠️ **Use it at your own risk.**
 
+### Optional modules
+The *Image* widget has new *copy/paste/save* functionalities introduced in **SimpleKivy** that require the following modules to work as expected.
+``` bash
+pip install pyperclipimg, requests, pillow
+``` 
+
+
 ## Highlights
 - **Simple** design philosophy. Forget about **kv** files. Write only python code and get a user interface that resembles your code! Define your layout, define an event manager, create your app and run!
 - **WebView** widget based on [pywebview](https://pywebview.flowrl.com) (extremely experimmental but it finally works!).
