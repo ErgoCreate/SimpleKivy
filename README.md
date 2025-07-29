@@ -124,7 +124,7 @@ app.run()
 
 # Next In The List
 - **Examples and documentation.**
-- **Fix bugs and improvements to existing widgets.**
+- **Fixing bugs and improvements to the existing widgets.**
 - **Cleaning up the source code.**
 
 # Suport Us
