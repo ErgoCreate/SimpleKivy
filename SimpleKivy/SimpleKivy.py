@@ -126,7 +126,8 @@ def android_moc():
             if os.path.exists('service/main.py'):
                 self.spath='service/main.py'
             else:
-                raise FileNotFoundError(f'The file "{os.path.abspath(os.path.join('service','main.py'))}" was not found.')
+                service_path=os.path.join('service','main.py')
+                raise FileNotFoundError(f'The file "{os.path.abspath(service_path)}" was not found.')
         def start(self,msg='service started'):
             
             
