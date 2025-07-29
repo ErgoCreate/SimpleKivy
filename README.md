@@ -40,7 +40,7 @@ pip install git+https://github.com/ErgoCreate/SimpleKivy.git
 ⚠️ **Use it at your own risk.**
 
 ### Optional modules
-The *Image* widget has new *copy/paste/save* functionalities introduced in **SimpleKivy** that require the following modules to work as expected.
+The *Image* widget has new *copy/paste/save* functionalities introduced in **SimpleKivy** that require the following modules to work as expected:
 ``` bash
 pip install pyperclipimg, requests, pillow
 ``` 
@@ -49,7 +49,7 @@ pip install pyperclipimg, requests, pillow
 ## Highlights
 - **Simple** design philosophy. Forget about **kv** files. Write only python code and get a user interface that resembles your code! Define your layout, define an event manager, create your app and run!
 - **WebView** widget based on [pywebview](https://pywebview.flowrl.com) (extremely experimmental but it finally works!).
-- **IconFont.** Easily integrate any webfont to display icons in labels and buttons. By default, you can use the [Material Desing Icons](https://materialdesignicons.com/tag/community) webfont as easily as setting `mdi("creation")` <img width="15" height="15" src="images/creation.png"> as the text in any widget that supports markup, similar to setting `<span class="mdi mdi-creation"></span>` in html.
+- **IconFont.** Easily integrate any webfont to display icons in labels and buttons. By default, you can use the [Material Desing Icons](https://materialdesignicons.com/tag/community) webfont as easily as setting `mdi("creation")` <img src="images/creation.svg" style="height:1em; vertical-align:middle;"> as the text in any widget that supports markup, similar to setting `<span class="mdi mdi-creation"></span>` in html.
 - Native File-chooser/file-save implementation using tkinter.
 - Boosted capabilities for widgets (background and line colors for the most used widgets).
 - **Widget maths!** Easily create rows or columns of widgets using simple math operators.
