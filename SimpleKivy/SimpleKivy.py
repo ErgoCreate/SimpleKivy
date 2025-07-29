@@ -897,6 +897,10 @@ class MyApp(App):
         # self.Clock.schedule_once(lambda dt: setattr(self.icon,'ico',))
         if icon=='skdata/logo/simplekivy-icon-32.png':
             self.ico=resource_find('skdata/logo/simplekivy-icon-256.ico')
+        # self.Clock.schedule_once(lambda dt: setattr(self.icon,'ico',))
+        # self.icon=icon
+        # Clock.schedule_once(lambda dt: setattr(self,'icon',icon),1)
+        Clock.schedule_once(lambda dt: self.on_icon(self,self.get_application_icon()))
         super().__init__(icon=icon,**kwargs)
 
     @property
@@ -1436,7 +1440,7 @@ class MyApp(App):
             **kw
             )
         root.destroy()
-        if callback:
+        if callback and filename:
             callback(filename)
         return filename
     def askdirectory(self,
@@ -1459,7 +1463,7 @@ class MyApp(App):
             **kw
             )
         root.destroy()
-        if callback:
+        if callback and filename:
             callback(filename)
         return filename
 
@@ -1497,7 +1501,7 @@ class MyApp(App):
             )
         root.destroy()
         # print(filename)
-        if callback:
+        if callback and filename:
             callback(filename)
         return filename
     def askopenfiles(self,
@@ -1530,7 +1534,7 @@ class MyApp(App):
             **kw
             )
         root.destroy()
-        if callback:
+        if callback and filenames:
             callback(filenames)
         return filenames
     def LoadingOpen(self):
@@ -3391,9 +3395,9 @@ def ActionToggleButton(text='actionbutton',enable_events=True,on_event="on_relea
     return kel
 
 @skwidget
-def ActionPrevious(title='title',k=None,with_previous=True,enable_events=True,bind_title=False,on_event='on_release',**kwargs):
+def ActionPrevious(title='title',k=None,app_icon='skdata/logo/simplekivy-icon-32.png',with_previous=True,enable_events=True,bind_title=False,on_event='on_release',**kwargs):
     from kivy.uix.actionbar import ActionPrevious as kvWd
-    kel=skivify_v2(kvWd,title=title,with_previous=with_previous,k=k,enable_events=enable_events,on_event=on_event,**kwargs)
+    kel=skivify_v2(kvWd,title=title,with_previous=with_previous,app_icon=app_icon,k=k,enable_events=enable_events,on_event=on_event,**kwargs)
     # if bind_title:
     #     Clock.schedule_once(lambda dt: utils.get_kvApp().bind(title=lambda ins,v:setattr(kel,'title',v)))
     if k==None and title:
