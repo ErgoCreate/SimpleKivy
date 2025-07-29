@@ -3745,7 +3745,36 @@ class HoldButton(kvButton):
 
 KV = """
 #:import Calendar calendar.Calendar
+<DatePicker@BoxLayout>:
+    calendar: Calendar()
+    padding: 8
+    picked: ["","",""]
+    
+    
+    months: ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"]
 
+    days: [(i if i > 0 else "") for i in self.calendar.itermonthdays(self.year, self.month)] + [""] * 14
+    orientation: "vertical"
+    NavBar:
+    WeekDays:
+    Week:
+        weekdays: root.days[0:7]
+    Week:
+        weekdays: root.days[7:14]
+    Week:
+        weekdays: root.days[14:21]
+    Week:
+        weekdays: root.days[21:28]
+    Week:
+        weekdays: root.days[28:35]
+    Week:
+        weekdays: root.days[35:]
+    LabelB:
+        text: "" if root.picked == ["","",""] else "{}/{}-{}".format(root.picked[0], root.picked[1], root.picked[2])
+        lcolor: .5,.5,.5,1
+        valign: "middle"
+        halign: "center"
+        font_name: 'Roboto-Bold.ttf'
 <Day@FlatButtonA>:
     datepicker: self.parent.datepicker
     color: [1,1,1,0]
@@ -3793,7 +3822,7 @@ KV = """
     Spinner:
         background_color: [31/255,136/255,217/255,1]
         values: root.datepicker.months
-        text: root.datepicker.months[root.datepicker.month-1]
+        text: root.datepicker.months[root.datepicker._month_minus()]
         on_text:
             root.datepicker.month = root.datepicker.months.index(self.text)+1
     Spinner:
@@ -3824,43 +3853,15 @@ KV = """
             if root.datepicker.month == 12 and spin.text == "Month": root.datepicker.year += 1
             if spin.text == "Month": root.datepicker.month = 1 if root.datepicker.month == 12 else root.datepicker.month + 1
             if spin.text == "Year": root.datepicker.year += 1
-<DatePicker@BoxLayout>:
-    # year: 2020
-    # month: 1
-    year: 2020
-    month: 1
-    padding: 8
-    picked: ["","",""]
-    months: ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"]
-    calendar: Calendar()
-    days: [(i if i > 0 else "") for i in self.calendar.itermonthdays(self.year, self.month)] + [""] * 14
-    orientation: "vertical"
-    NavBar:
-    WeekDays:
-    Week:
-        weekdays: root.days[0:7]
-    Week:
-        weekdays: root.days[7:14]
-    Week:
-        weekdays: root.days[14:21]
-    Week:
-        weekdays: root.days[21:28]
-    Week:
-        weekdays: root.days[28:35]
-    Week:
-        weekdays: root.days[35:]
-    LabelB:
-        text: "" if root.picked == ["","",""] else "{}/{}-{}".format(root.picked[0], root.picked[1], root.picked[2])
-        lcolor: .5,.5,.5,1
-        valign: "middle"
-        halign: "center"
-        font_name: 'Roboto-Bold.ttf'
+
 """#.replace('__year__',str(current_date.year)).replace('__month__',str(current_date.month))
 Builder.load_string(KV)
 class DatePicker(BoxLayout):
-    pass
+    months= ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"]
     year=NumericProperty(2020)
     month=NumericProperty(1)
+    def _month_minus(self):
+        return self.month-1
     # def on_date_selected(self,dmy):
     #     print(dmy)
 
