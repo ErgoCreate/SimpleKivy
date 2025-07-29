@@ -11,13 +11,13 @@ def readme():
 setuptools.setup(
     name="SimpleKivy",
     version="0.0.1",
-    author="SuperMechaDeathChrist",
+    author="ErgoCreate",
     author_email="miguel_nunez95@hotmail.com",
     description="A new way to make user interfaces using a PySimpleGUI approach and with all the power of Kivy",
     long_description=readme(),
     long_description_content_type="text/markdown",
     keywords="GUI UI kivy wrapper simple easy beginner novice student android app",
-    url="https://github.com/SuperMechaDeathChrist/SimpleKivy",
+    url="https://github.com/ErgoCreate/SimpleKivy",
     packages=setuptools.find_packages(),
     classifiers=(
         "Programming Language :: Python :: 3",
