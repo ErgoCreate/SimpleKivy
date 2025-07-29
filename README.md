@@ -23,7 +23,21 @@ Building **Kivy** apps traditionally requires managing multiple files (`.py` + `
 - **✨ Make It Stunning** – Access Kivy's animations, effects, and features effortlessly.  
 - **🤖 Backend-First** – Keep your app logic clean while the GUI adapts.
 
-## **Get Started in Minutes!** 
+# **Getting started**
+## Installation
+***SimpleKivy has only been tested on **Windows** and on Python 3.10>. Support this project if you are interested on Linux and MacOS implementations.***
+### Kivy
+You need to install the latest version of `Kivy`. Installation instructions can be found [here](https://kivy.org/doc/stable/gettingstarted/installation.html).
+
+### SimpleKivy
+You can install the latest development version with:
+``` bash
+pip install git+https://github.com/ErgoCreate/SimpleKivy.git
+``` 
+
+⚠️ **This project is in the early stages of development and is expected to change in the future.**
+
+⚠️ **Use it at your own risk.**
 
 ## Highlights
 - **Simple** design philosophy. Forget about **kv** files. Write only python code and get a user interface that resembles your code! Define your layout, define an event manager, create your app and run!
@@ -48,20 +62,6 @@ Building **Kivy** apps traditionally requires managing multiple files (`.py` + `
     - `size = "xchildren"` dynamically sets the width to the sum of the children's width.
     - `size = "ychildren"` dynamically sets the height to the sum of the children's height.
     - `size = "xchildrenychildren"` dynamically sets the size to the sum of the children's width and height.
-
-
-# Installation
-##### SimpleKivy has only been tested on **Windows** and on Python 3.12. Support this project if you are interested on Linux and MacOS implementations
-### Kivy
-You need to install the latest version of `Kivy`. Installation instructions can be found [here](https://kivy.org/doc/stable/gettingstarted/installation.html).
-
-### SimpleKivy
-At the moment, you only need the `SimpleKivy`  directory and its contents to use this library. You can either keep it in the same directory as your main code or place it in your `.../Lib` directory . You can download it from this branch.
-Other means of installation are not supported at the moment. 
-
-* **This project is in the early stages of development and is expected to change in the future.**
-
-* **Use it at your own risk.**
 
 # Usage
 
