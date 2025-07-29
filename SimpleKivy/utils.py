@@ -1123,9 +1123,7 @@ def md2markdown(t):
 #             Application.Run(form)
 
 
-import os
-import re
-from pathlib import Path
+
 
 def replace_module_imports(root_dir, old_module, new_module):
     """
