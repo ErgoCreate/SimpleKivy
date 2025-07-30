@@ -3492,9 +3492,6 @@ class Arl_Selectable(RecycleDataViewBehavior,kvb.HoverHighlightBehavior, BoxLayo
     wsubtitle=ObjectProperty(None)
     meta=ObjectProperty(None)
 
-
-    
-
     # lcolor = ListProperty(Colors['gray'])
 
     def refresh_view_attrs(self, rv, index, data):
@@ -3568,7 +3565,7 @@ class Arl_Selectable(RecycleDataViewBehavior,kvb.HoverHighlightBehavior, BoxLayo
 
 class Artistlist(RecycleView):
     scroll_type= ['bars','content']
-    # 
+    #
     data_selected=ListProperty([])
     index_selected=ListProperty([])
     # selected_color=ListProperty([.0, 0.9, .1, .3])
@@ -3584,18 +3581,98 @@ class Artistlist(RecycleView):
 
     cols=NumericProperty(None)
     rows=NumericProperty(None)
+    def _auto_fit(self,ins):
+        Clock.schedule_once(lambda dt:self.__auto_fit(ins))
+    def _does_it_fit(self,grid,cols):
+        if grid.cols and len(grid.children)>1:
+            # print('here')
+            row0_minw=0
+            for i in range(min((cols,len(grid.children)))):
+                row0_minw+=grid.children[i].minimum_width
+            # print(f"{ins.width=}, {row0_minw=}")
+            if grid.width<row0_minw and grid.cols>1:
+                return False
+            else:
+                return True
+        else:
+            return True
+    def __auto_fit(self,ins):
+        # oins=ins
+        # try:
+        grid=ins.children[0]
+
+        if not self._does_it_fit(grid,self.cols):
+            self.cols-=1
+            self.__auto_fit(ins)
+        else:
+            # if grid.cols:
+            row_w=0
+            new_cols=0
+            for w in grid.children:
+                if grid.width>row_w+w.cover_size:
+                    row_w+=w.cover_size
+                    new_cols+=1
+                else:
+                    break
+            print(new_cols,self.cols)
+            if new_cols and new_cols!=self.cols:
+                # self.cols=new_cols
+                Clock.schedule_once(lambda dt:setattr(self,'cols',new_cols))
+            # if new_cols!=grid.cols:
+            #     self.cols=new_cols
+        # except:
+        #     pass
+
+
+        # elif self._does_it_fit(grid,self.cols+):
+            # self.cols+=1
+            # self._auto_fit(ins)
+
+        # ins=ins.children[0]
+        # # print(ins,ins.children)
+        # if len(ins.children)>1:
+        #     # print('here')
+        #     row0_minw=0
+        #     for i in range(min((self.cols,len(ins.children)))):
+        #         row0_minw+=ins.children[i].minimum_width
+        #     # print(f"{ins.width=}, {row0_minw=}")
+        #     if ins.width<row0_minw and self.cols>1:
+        #         self.cols-=1
+        #         self._auto_fit(oins)
+        #     else:
+        #         row0_minw=0
+        #         for i in range(min((self.cols+1,len(ins.children)))):
+        #             row0_minw+=ins.children[i].minimum_width
 
 
 
-    def __init__(self,data,keyboard_scroll=True, **kwargs):
+    def __init__(self,keyboard_scroll=True, **kwargs):
         self.register_event_type('on_ref_press')
         self.register_event_type('on_selection')
         self.register_event_type('on_option_selection')
         # self.register_event_type('on_purge_other_options')
+        
 
         super(Artistlist, self).__init__(**kwargs)
-        self.data=data
+        # self.data=data
+        # on_width: self._auto_fit(root)
+        
         self.layout_manager.bind(selected_nodes=self._select)
+
+        if self.cols==None and self.rows==None:
+            self.cols=2
+            self.children[0].bind(width= lambda *x:self._auto_fit(self) )
+            self.bind(data= lambda *x:self._auto_fit(self))
+
+
+            # self.width=self.width+.01
+            # self.on_width()
+            # self.bind(parent= lambda *x:self.children[0].do_layout())
+
+            # Clock.schedule_once(lambda dt:print(self.children[0]))
+            # self._auto_fit(self)
+        
+
 
     def on_ref_press(self, refvalue):
         # print(self,instance, refvalue)
