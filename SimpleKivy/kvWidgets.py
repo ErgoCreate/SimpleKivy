@@ -3614,7 +3614,7 @@ class Artistlist(RecycleView):
                     new_cols+=1
                 else:
                     break
-            print(new_cols,self.cols)
+            # print(new_cols,self.cols)
             if new_cols and new_cols!=self.cols:
                 # self.cols=new_cols
                 Clock.schedule_once(lambda dt:setattr(self,'cols',new_cols))
@@ -3660,7 +3660,7 @@ class Artistlist(RecycleView):
         self.layout_manager.bind(selected_nodes=self._select)
 
         if self.cols==None and self.rows==None:
-            self.cols=2
+            self.cols=3
             self.children[0].bind(width= lambda *x:self._auto_fit(self) )
             self.bind(data= lambda *x:self._auto_fit(self))
 
