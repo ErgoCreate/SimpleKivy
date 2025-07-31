@@ -1,3 +1,4 @@
+import io
 from kivy.lang import Builder
 '''
 Text Input
@@ -4853,6 +4854,13 @@ class Image(Widget):
         elif keep_ratio and allow_stretch:
             self.fit_mode = "contain"
 
+    def from_bytes(self,b,**args):
+        cim=CoreImage(io.BytesIO(b), ext='png')
+        # self.texture=cim.texture
+        Clock.schedule_once(lambda dt:setattr(self,'texture',cim.texture))
+        return cim
+
+
 
     def texture_update(self, *largs):
         self.set_texture_from_resource(self.source)
@@ -4877,7 +4885,10 @@ class Image(Widget):
                 nocache=self.nocache,
             )
         except Exception:
-            Logger.error('Image: Error loading <%s>' % resource)
+            if getattr(self,'_ignore_load_errors',False):
+                pass
+            else:
+                Logger.error('Image: Error loading <%s>' % resource)
             self._clear_core_image()
             image = self._coreimage
         if image:

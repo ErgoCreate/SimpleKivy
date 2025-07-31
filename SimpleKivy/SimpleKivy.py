@@ -3476,9 +3476,11 @@ def Image(
     fit_mode='contain', # scale-down, fill, contain, cover
     maximum_width=None,
     copypaste = False,
+    is_svg=False,
     **kwargs
     ):
-
+    if source and not is_svg:
+        is_svg=os.path.splitext(source)[-1].lower()=='.svg'
     if async_load:
         # from kivy.uix.image import AsyncImage as kvImage
         kvImage=mkvw.AsyncImage
@@ -3569,7 +3571,48 @@ def Image(
             def save_to_path_dialog(self,filetypes=( ("PNG","*.png"), ("JPG","*.jpg"), ), defaultextension=".png", **kw):
                 self.save_to_path(get_kvApp().asksaveasfile(filetypes=filetypes,defaultextension=defaultextension, **kw))
 
-        
+    if is_svg:
+        _kvImage=kvImage
+        from cairosvg import svg2png
+        class kvImage(_kvImage):
+            # __events__ = ('on_error')
+            _ignore_load_errors=True
+            def __init__(self,**kwargs):
+                self.register_event_type('on_error')
+                # self.bind(source=self._on_src)
+                self.fbind('source', self._load_source)
+                self.fbind('size',self._load_source)
+                super(kvImage, self).__init__(**kwargs)
+                
+                
+
+                # self.texture=self.frombytes(svg2png())
+            def _load_source(self,ins,src):
+                # self._found_source=ins.source
+                # if not source:
+                #     self.texture=None
+                #     return
+                try:
+                    self.from_bytes(
+                            svg2png(
+                                url=ins.source,
+                                output_width=ins.width,
+                                output_height=ins.height,
+                                parent_width=ins.width,
+                                parent_height=ins.height,
+                            )
+                        )
+                except Exception as error:
+                    self.dispatch('on_error', error)
+                    sup=super()
+                    if hasattr(sup,'_load_source'):
+                        sup._load_source(ins,ins.source)
+            def on_error(self,error):
+                pass
+                
+
+
+
 
 
     # if fit_mode!='full':
