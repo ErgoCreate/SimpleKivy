@@ -40,7 +40,7 @@ Building **Kivy** apps traditionally requires managing multiple files (`.py` + `
 ## Installation
 ***SimpleKivy has only been tested on **Windows** and on Python 3.10>. Support this project if you are interested on Linux and MacOS implementations.***
 ### Kivy
-You need to install the latest version of `Kivy`. Installation instructions can be found [here](https://kivy.org/doc/stable/gettingstarted/installation.html).
+You need to install the `2.3` version of `Kivy`. Installation instructions can be found [here](https://kivy.org/doc/stable/gettingstarted/installation.html).
 
 ### SimpleKivy
 You can install the latest development version with:
