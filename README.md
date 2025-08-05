@@ -13,8 +13,9 @@ I’m currently pursuing my doctoral studies in the USA, and your support would 
 If you find **SimpleKivy** useful, consider donating to help fund my education and development efforts. Every contribution, no matter how small, makes a difference!  
 
 🌐 **Donate via:**  
-<!-- - [GitHub Sponsors](your_github_sponsors_link) -->
+- [Patreon](https://www.patreon.com/ErgoCreate/membership)
 - [PayPal](https://www.paypal.com/cgi-bin/webscr?cmd=_s-xclick&hosted_button_id=339JUWC5BY6UN&source=url)
+<!-- - [GitHub Sponsors](your_github_sponsors_link) -->
 <!-- - [Ko-fi](your_ko-fi_link) *(or other platforms)* -->
 
 Thank you for your generosity! 🙏 
@@ -151,6 +152,8 @@ SimpleKivy will always remain completely free, and no features will ever be lock
 ![paypal_QR](images/image_2024-02-27_094804298.png)
 
 [Make a donation (PayPal)](https://www.paypal.com/cgi-bin/webscr?cmd=_s-xclick&hosted_button_id=339JUWC5BY6UN&source=url)
+
+[Subscribe to Patreon](https://www.patreon.com/ErgoCreate/membership)
 
 Either way, **SimpleKivy is free to use!**
 
