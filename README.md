@@ -2,9 +2,22 @@
 
 <img align="right" height="256" src="SimpleKivy/skdata/logo/simplekivy-icon-256.png"/>
 
-A **simplified** and **intuitive** way to build **Kivy** applications, while retaining the full power and flexibility of **Kivy**.  
+A **simplified** and **intuitive** way to build **Kivy** GUI applications, while retaining the full power and flexibility of **Kivy**.  
 
 🚀 **Check out the [Ergo Create YouTube Channel](https://www.youtube.com/@ErgoCreate) for tutorials, examples, and live coding sessions!**  
+
+### Support My Doctoral Studies in the USA 🇺🇸  
+
+I’m currently pursuing my doctoral studies in the USA, and your support would help me focus on research while maintaining this and other open-source projects.  
+
+If you find **SimpleKivy** useful, consider donating to help fund my education and development efforts. Every contribution, no matter how small, makes a difference!  
+
+🌐 **Donate via:**  
+<!-- - [GitHub Sponsors](your_github_sponsors_link) -->
+- [PayPal](https://www.paypal.com/cgi-bin/webscr?cmd=_s-xclick&hosted_button_id=339JUWC5BY6UN&source=url)
+<!-- - [Ko-fi](your_ko-fi_link) *(or other platforms)* -->
+
+Thank you for your generosity! 🙏 
 
 ### **Why SimpleKivy?**  
 
