@@ -10,7 +10,7 @@ def readme():
 
 setuptools.setup(
     name="SimpleKivy",
-    version="0.0.2",
+    version="0.1.0-beta.1",
     author="ErgoCreate",
     author_email="miguel_nunez95@hotmail.com",
     description="A new way to make user interfaces using a PySimpleGUI approach and with all the power of Kivy",
