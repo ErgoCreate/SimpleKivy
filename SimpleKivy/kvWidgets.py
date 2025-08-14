@@ -2,6 +2,7 @@ import sys
 import os
 
 kvw = sys.modules[__name__]
+NOTKEY=-67191210201
 import re
 from . import kvBehaviors as kvb
 # from .utils import *
@@ -587,6 +588,8 @@ class BgLineState(object):
         """Update line width"""
         self.line.width = value
 
+class BoxLayoutB(BgLine,BoxLayout):
+    pass
 
 class RoundBgLineState(object):
     r=NumericProperty(8)
@@ -873,7 +876,7 @@ Builder.load_string("""
         Rectangle:
             pos: self.pos
             size: self.size
-
+    canvas.after:
         Color:
             rgba: self.lcolor
         Line:
@@ -1646,29 +1649,12 @@ class SplitterV2(ButtonBehavior,BoxLayout):
 
 
 Builder.load_string('''
-<SelectableLabel>:
-    
-    # halign: root.halign
-    # valign: root.valign
-    # markup: root.markup
-    # text_size: root.width,root.height
-    # on_pos: lambda *x:setattr(self,'text_size',self.size)
-    # on_size: self.setter("text_size")
-
-    # # Draw a background to indicate selection
-    # canvas.before:
-    #     Color:
-    #         rgba: root._set_selected_color()
-    #     Rectangle:
-    #         pos: self.pos
-    #         size: self.size
-    
 <RV>:
     scroll_type: ['bars','content']
     bar_width: 8
     bar_color: [.4, .4, .4, .9]
     bar_inactive_color: [.4, .4, .4, .6]
-    viewclass: 'SelectableLabel'
+    # viewclass: 'SelectableLabel'
     SelectableRecycleBoxLayout:
         padding: self.parent.padding
         spacing: self.parent.spacing
@@ -1691,52 +1677,27 @@ class SelectableRecycleBoxLayout(FocusBehavior, LayoutSelectionBehavior,
         if parent:
             self.selected_color=parent.selected_color
 
-
-# class SelectableLabel(RecycleDataViewBehavior, LabelB):
-#     ''' Add selection support to the Label '''
-#     index = None
-#     selected = BooleanProperty(False)
-#     selectable = BooleanProperty(True)
-#     # lcolor = ListProperty(Colors['gray'])
-
-#     def refresh_view_attrs(self, rv, index, data):
-#         ''' Catch and handle the view changes '''
-#         self.index = index
-#         return super(SelectableLabel, self).refresh_view_attrs(
-#             rv, index, data)
-
-#     def on_touch_down(self, touch):
-#         ''' Add selection on touch down '''
-#         if super(SelectableLabel, self).on_touch_down(touch):
-#             return True
-#         if self.collide_point(*touch.pos) and self.selectable:
-#             return self.parent.select_with_touch(self.index, touch)
-
-#     def apply_selection(self, rv, index, is_selected):
-#         ''' Respond to the selection of items in the view. '''
-#         self.selected = is_selected
-#         if is_selected:
-#             # print("selection changed to {0}".format(rv.data[index]))
-#             pass
-#         else:
-#             # print("selection removed for {0}".format(rv.data[index]))
-#             pass
-
-class  SelectableLabel(RecycleDataViewBehavior,LabelB):
+class SelectableLabelBehavior(RecycleDataViewBehavior):
     ''' Add selection support to the Label '''
     index = None
     selected = BooleanProperty(False)
     selectable = BooleanProperty(True)
-    markup = BooleanProperty(False)
+    # markup = BooleanProperty(False)
     meta = ObjectProperty(None)
 
-    valign=OptionProperty('bottom',options=('bottom','middle','center','top'))
-    halign=OptionProperty('left',options=('auto','left','center','right','justify'))
+    # valign=OptionProperty('bottom',options=('bottom','middle','center','top'))
+    # halign=OptionProperty('left',options=('auto','left','center','right','justify'))
 
     option_selected=BooleanProperty(False)
     touch_button=OptionProperty('',options=('','left','right'))
-
+    state=OptionProperty('normal',options=('normal','down'))
+    buttonbehavior=BooleanProperty(False)
     selected_color=ListProperty([.5, 0.5, .5, .3])
+    # __events__=("on_release")
+    
+    def __init__(self,**kwargs):
+        self.register_event_type('on_release')
+        super(SelectableLabelBehavior, self).__init__(**kwargs)
 
     def on_parent(self,ins,parent):
         # print(ins,parent)
@@ -1788,6 +1749,7 @@ class  SelectableLabel(RecycleDataViewBehavior,LabelB):
 
 
     def refresh_view_attrs(self, rv, index, data):
+        # print(data)
         ''' Catch and handle the view changes '''
         self.index = index
         # if rv.option_selected:
@@ -1801,28 +1763,36 @@ class  SelectableLabel(RecycleDataViewBehavior,LabelB):
             elif k== 'font_name':
                 data[k]=utils.Fonts.get(v,v)
 
+        data['color']=data.get('color',(1,1,1,1))
         data['valign']=data.get('valign','middle')
         data['halign']=data.get('halign','left')
         data['padding']=data.get('padding',4)
+        data['selectable']=data.get('selectable',True)
+        data['buttonbehavior']=data.get('buttonbehavior',False)
+        # data['bcolor_down']=data.get('bcolor_down',(.66,.66,.66,1))
+        data['bcolor_down']=data.get('bcolor_down',self.selected_color)
 
-        return super(SelectableLabel, self).refresh_view_attrs(
+        return super(SelectableLabelBehavior, self).refresh_view_attrs(
             rv, index, data
             )
 
     def on_touch_down(self, touch):
         ''' Add selection on touch down '''
-        
+        self.state='normal'
         if touch.button=='left':
-            if super(SelectableLabel, self).on_touch_down(touch):
+            if super(SelectableLabelBehavior, self).on_touch_down(touch):
                 return True
-            if self.collide_point(*touch.pos) and self.selectable:
-                self.touch_button='left'
-                self.option_selected=False
-                return self.parent.select_with_touch(self.index, touch)
+            if self.collide_point(*touch.pos):
+                if self.buttonbehavior:
+                    self.state='down'
+                if self.selectable:
+                    self.touch_button='left'
+                    self.option_selected=False
+                    return self.parent.select_with_touch(self.index, touch)
         elif touch.button=='right':
-            if super(SelectableLabel, self).on_touch_down(touch):
+            if super(SelectableLabelBehavior, self).on_touch_down(touch):
                 return True
-            if self.collide_point(*touch.pos) and self.selectable:
+            if self.selectable and self.collide_point(*touch.pos):
                 self.touch_button='right'
                 # return self.parent.select_with_touch(self.index, touch)
                 # self.option_selected=True
@@ -1835,7 +1805,19 @@ class  SelectableLabel(RecycleDataViewBehavior,LabelB):
         else:
             self.option_selected=False
             self.touch_button=''
-
+    def on_touch_up(self,touch):
+        if self.collide_point(*touch.pos) and self.state=='down':
+            self.dispatch('on_release',self.parent.parent,self.index)
+            self.state='normal'
+    def on_state(self,ins,v):
+        # print(self,ins,v)
+    #     bcolor_normal = ListProperty([.345, .345, .345, 1])
+    
+    # bcolor_down = ListProperty([.2, .64, .8, 1])
+        if v=='down':
+            self.bcolor=getattr(self,'bcolor_down',[.345, .345, .345, 1])
+        else:
+            self.bcolor=getattr(self,'bcolor_normal',[.2, .64, .8, 1])
 
     def apply_selection(self, rv, index, is_selected):
         ''' Respond to the selection of items in the view. '''
@@ -1863,6 +1845,9 @@ class  SelectableLabel(RecycleDataViewBehavior,LabelB):
         self.parent.parent.index_ref_pressed
         self.parent.parent.dispatch('on_ref_press',refvalue)
 
+    def on_release(self,rv,index):
+        pass
+
 
 class RV(RecycleView,BgLine):
     data_selected=ListProperty([])
@@ -1883,18 +1868,40 @@ class RV(RecycleView,BgLine):
     
     bcolor=ListProperty([0,0,0, 0])
 
+    def set_new_viewclass(self,viewclass_base,hover_highlight=True):
+        _viewclass=viewclass_base
+        
+        if hover_highlight:
+            # class _(kvb.HoverHighlightBehavior,_viewclass,):
+            #     pass
+            # _viewclass=_
+            if not hasattr(_viewclass,'_higlight_color'):
+                class _(kvb.HoverHighlightBehavior,_viewclass,):
+                    pass
+                _viewclass=_
 
+        # selectable=getattr( _viewclass)
+        if not hasattr(_viewclass,'refresh_view_attrs'):
+            class _(SelectableLabelBehavior,_viewclass):
+                pass
+            _viewclass=_
+        self.viewclass=_viewclass
 
-    def __init__(self,data,keyboard_scroll=True, **kwargs):
+    def __init__(self,data,keyboard_scroll=True,viewclass_base=None, **kwargs):
 
         self.register_event_type('on_ref_press')
         self.register_event_type('on_selection')
         self.register_event_type('on_option_selection')
+        self.register_event_type('on_double_click')
         # self.register_event_type('on_purge_other_options')
 
         super(RV, self).__init__(**kwargs)
+        # self.viewclass=_viewclass
+        if viewclass_base==None:
+            viewclass_base=LabelB
+        self.set_new_viewclass(viewclass_base,hover_highlight=True)
         # SelectableLabel.selected_color.defaultvalue=self.selected_color
-        
+        # print(self.viewclass)
         self.data=data
         self.layout_manager.bind(selected_nodes=self._select)
     # def on_selected_color(self,ins,v):
@@ -1967,6 +1974,9 @@ class RV(RecycleView,BgLine):
 
 
     def on_selection(self,*largs):
+        # print('selection',largs)
+        pass
+    def on_double_click(self,*largs):
         pass
     def on_option_selection(self,*largs):
         pass
@@ -1996,6 +2006,191 @@ class RV(RecycleView,BgLine):
             self.children[0].deselect_node(i)
     def clear_selection(self):
         self.children[0].clear_selection()
+
+
+class  SelectableRowBehavior(RecycleDataViewBehavior):
+    ''' Add selection support to the Label '''
+    index = None
+    selected = BooleanProperty(False)
+    selectable = BooleanProperty(True)
+    meta = ObjectProperty(None)
+    option_selected=BooleanProperty(False)
+    touch_button=OptionProperty('',options=('','left','right'))
+    selected_color=ListProperty([.5, 0.5, .5, .3])
+    # def __init__(self,**kwargs):
+    #     self.register_event_type('on_double_tap')
+    #     super(SelectableRowBehavior, self).__init__(**kwargs)
+    def on_parent(self,ins,parent):
+        if parent:
+            self.selected_color=parent.selected_color
+    def on_selected(self,ins,v):
+        if v :
+            self.bcolor=self.selected_color
+        else:
+            try:
+                self.bcolor=self.parent.parent.data[self.index].get('bcolor',(0,0,0,0))
+            except:
+                self.bcolor=(0,0,0,0)
+    def refresh_view_attrs(self, rv, index, data):
+        self.index = index
+        for k,v in data.items():
+            if 'color' in k:
+                data[k]=resolve_color(v)
+            elif k== 'font_name':
+                data[k]=utils.Fonts.get(v,v)
+        data['padding']=data.get('padding',4)
+        data['bcolor_down']=data.get('bcolor_down',self.selected_color)
+
+        return super(SelectableRowBehavior, self).refresh_view_attrs(
+            rv, index, data
+            )
+    # def _dt_double_click(self,dt):
+    #     self.parent.parent.dispatch('on_double_click',self.index)
+    def on_touch_down(self, touch):
+        ''' Add selection on touch down '''
+        
+        if touch.button=='left':
+
+
+            if super(SelectableRowBehavior, self).on_touch_down(touch):
+                return True
+            if self.collide_point(*touch.pos) and self.selectable:
+                self.touch_button='left'
+                self.option_selected=False
+                if touch.is_double_tap:
+                    # Clock.unschedule(self._dt_double_click)
+                    # Clock.schedule_once(self._dt_double_click)
+                    self.parent.parent.dispatch('on_double_click',self.index)
+                return self.parent.select_with_touch(self.index, touch)
+
+        elif touch.button=='right':
+            if super(SelectableRowBehavior, self).on_touch_down(touch):
+                return True
+            if self.collide_point(*touch.pos) and self.selectable:
+                self.touch_button='right'
+                self.parent.parent.index_option_selected=self.index
+                self.parent.parent.widget_option_selected=self
+                self.parent.parent.dispatch('on_option_selection',self.index)
+        else:
+            self.option_selected=False
+            self.touch_button=''
+    # def on_double_tap(self,ins):
+    #     pass
+    def apply_selection(self, rv, index, is_selected):
+        ''' Respond to the selection of items in the view. '''
+        self.selected = is_selected
+    def on_ref_press(self,refvalue):
+        self.parent.parent.index_ref_pressed
+        self.parent.parent.dispatch('on_ref_press',refvalue)
+
+
+class RowSelectable(SelectableRowBehavior,BoxLayoutB):
+    data=ListProperty([] )
+    # viewclass=ObjectProperty(None)
+    _vclass = None
+    defaults={}
+    last_len=0
+
+    # def __init__(self,**kwargs):
+    #     super(RowSelectable, self).__init__(**kwargs)
+        # self.add_widget(LabelB(text='hell',lcolor='r'))
+
+
+    def on_data(self,ins,data):
+        # print(f"{data = }")
+        # print('default props:',self.viewclass().properties())
+        # d=len(data)-len(self.children)
+        # if not d:
+        ldata=len(data)
+        if self.last_len!=ldata:
+            self.last_len=ldata
+            self.clear_widgets()
+            if self._vclass:
+                # print(self.viewclass)
+                for di in data:
+                    # text='',k=None,focus_behavior=False,halign='center',size_behavior='normal',valign='middle',hover_highlight=False,
+                    # print(di)
+                    kw=self.defaults.copy()
+                    kw.update(di)
+                    self.add_widget(
+                        self._vclass(**kw)
+                        )
+        else:
+            if self._vclass:
+                # print(self.viewclass)
+                for i,di in enumerate(data):
+                    # text='',k=None,focus_behavior=False,halign='center',size_behavior='normal',valign='middle',hover_highlight=False,
+                    # print(di)
+                    kw=self.defaults.copy()
+                    kw.update(di)
+                    # self.add_widget(
+                    #     self._vclass(**kw)
+                    #     )
+                    for k,v in kw.items():
+                        setattr(self.children[-i-1],k,v)
+
+        # elif d>0:
+        #     for di in range(d):
+        #         self.add_widget(
+        #             LabelA(text=f'{di}')
+        #             )
+        # elif d<0:
+        #     for di in range(abs(d)):
+        #         self.remove_widget(self.children[0])
+
+
+        # print(self.children)
+    # def on_parent(self,ins,parent):
+    #     # print(f"{parent = }")
+    #     if parent:
+    #         self.viewclass=parent.viewclass_cell
+    #         print('here')
+    # def on_size(self,ins,size):
+    #     print(f"{size = }")
+
+# class Row(BoxLayoutB):
+#     bcolor=ColorProperty('r')
+
+# Builder.load_string('''
+# <Filelist>:
+#     scroll_type: ['bars','content']
+#     bar_width: 8
+#     bar_color: [.4, .4, .4, .9]
+#     bar_inactive_color: [.4, .4, .4, .6]
+    
+#     SelectableRecycleBoxLayout:
+#         padding: self.parent.padding
+#         spacing: self.parent.spacing
+#         default_size: None, dp(56)
+#         default_size_hint: 1, None
+#         size_hint_y: None
+#         height: self.minimum_height
+#         orientation: 'vertical'
+#         multiselect: False
+#         touch_multiselect: True
+# ''')
+
+# class Filelist(RV):
+#     viewclass=RowSelectable
+#     data=
+#     # def on_data(self,ins,data):
+#     #     print(data)
+#     #     return True
+
+#     # def __init__(self,**kwargs):
+#     #     super(Filelist, self).__init__(**kwargs)
+#     #     self.set_new_viewclass(RoundBgLineState,selectable=False,hover_highlight=True)
+
+class Rowlist(RV):
+    viewclass_cell=ObjectProperty(None)
+    cell_defaults=ObjectProperty({})
+    def on_viewclass(self,ins,v):
+        if v:
+            self.viewclass._vclass=self.viewclass_cell
+            self.viewclass.defaults=self.cell_defaults
+        # print(v)
+        # if self.children:
+        #     self.children[0].viewclass_cell=v
 
 
 
@@ -2192,8 +2387,7 @@ class Cell(kvw.FlatButtonA,kvw.TouchBehavior):
 #     lcolor = ListProperty([1, 1, 1, 0])
 #     lwidth=NumericProperty(1)
 
-class BoxLayoutB(BgLine,BoxLayout):
-    pass
+
 
     # def on_size_callback(self,instance):
     #     print('hell')
@@ -3028,6 +3222,7 @@ class Playlist(RecycleView):
         self.register_event_type('on_ref_press')
         self.register_event_type('on_selection')
         self.register_event_type('on_option_selection')
+
         # self.register_event_type('on_purge_other_options')
 
         super(Playlist, self).__init__(**kwargs)
@@ -3073,6 +3268,7 @@ class Playlist(RecycleView):
         pass
     def on_option_selection(self,*largs):
         pass
+
 
     def scroll(self,val):
         self.scroll_y=val
@@ -3435,7 +3631,7 @@ Builder.load_string('''
 <Artistlist>:
     viewclass: 'Arl_Selectable'
     SelectableRecycleGridLayout:
-        spacing: 8
+        
         default_size: root.default_size
         default_size_hint: root.default_size_hint
 
@@ -3448,6 +3644,10 @@ Builder.load_string('''
         touch_multiselect: True
         cols: root.cols
         rows: root.rows
+        
+        padding: root.padding
+        spacing: root.spacing
+
 
 ''')
 
@@ -3491,6 +3691,8 @@ class Arl_Selectable(RecycleDataViewBehavior,kvb.HoverHighlightBehavior, BoxLayo
     # image_cover=ObjectProperty(None)
     wsubtitle=ObjectProperty(None)
     meta=ObjectProperty(None)
+
+    
 
     # lcolor = ListProperty(Colors['gray'])
 
@@ -3577,12 +3779,113 @@ class Artistlist(RecycleView):
     index_ref_pressed=NumericProperty()
 
     default_size=ListProperty([None, 160])
+    # data=ListProperty([])
     default_size_hint=ListProperty([1, None])
+    do_auto_fit=BooleanProperty(False)
 
     cols=NumericProperty(None)
     rows=NumericProperty(None)
-    def _auto_fit(self,ins):
-        Clock.schedule_once(lambda dt:self.__auto_fit(ins))
+    padding=VariableListProperty([0,0,0,0])
+    spacing=VariableListProperty([8,8],length=2)
+    # def _auto_fit(self,*args):
+    #     self.__auto_fit(0)
+        # print('here',args)
+        # Clock.schedule_once(lambda dt:self.__auto_fit(self),.15)
+        # return False
+        # Clock.unschedule(self._auto_fit)
+        # Clock.schedule_once(lambda dt:self.__auto_fit(self))
+        # try:
+        #     Clock.unschedule_once(self.__auto_fit)
+        # except:
+        #     pass
+        # Clock.schedule_once(self.__auto_fit)
+    
+    
+
+
+    def __init__(self,data=[],keyboard_scroll=True, **kwargs):
+        self.register_event_type('on_ref_press')
+        self.register_event_type('on_selection')
+        self.register_event_type('on_option_selection')
+        # self.register_event_type('on_data')
+        
+        # self.register_event_type('on_purge_other_options')
+        
+
+        super(Artistlist, self).__init__(data=data,**kwargs)
+        self.data=data
+        # on_width: self._auto_fit(root)
+        
+        self.layout_manager.bind(selected_nodes=self._select)
+
+        if self.cols==None and self.rows==None:
+            self.cols=2
+            self.do_auto_fit=True
+            # Clock.schedule_once(self._init)
+            # self.children[0].bind(width= lambda *x:self._auto_fit(self) )
+            # self.bind(data= lambda *x:self._auto_fit(self))
+            
+            # self.setter('data')(self,self.data)
+            # self.bind(parent=self._auto_fit)
+            # self._auto_fit()
+
+
+            # self.width=self.width+.01
+            # self.on_width()
+            # self.bind(parent= lambda *x:self.children[0].do_layout())
+
+            # Clock.schedule_once(self._auto_fit)
+            # self._auto_fit(self)
+    def on_data(self,*largs):
+        # print(largs)
+        if self.do_auto_fit:
+            # self._auto_fit()
+            Clock.schedule_once(self._auto_fit)
+    def on_width(self,*largs):
+        # print(largs)
+        if self.do_auto_fit:
+            Clock.schedule_once(self._auto_fit)
+            # self._auto_fit()
+    # def _init(self,dt):
+    #     self.cols=2
+    #     # self.bind(width=lambda *x:self.__auto_fit(0))
+    #     # self.bind(on_data=self.__auto_fit)
+    #     # self.children[0]._trigger_layout()
+    #     self.do_auto_fit=True
+
+    def on_ref_press(self, refvalue):
+        # print(self,instance, refvalue)
+        pass
+    def _select(self,*largs):
+        # print(largs)
+        if largs[1]:
+            self.index_selected=largs[1]
+            
+            self.data_selected=[]
+            # oscount=0
+            for s in largs[1]:
+                # print(self.data[s])
+                # if s['option_selected']:
+                #     oscount+=1
+                self.data_selected.append(self.data[s])
+            self.dispatch('on_selection',*largs)
+            # if oscount:
+            #     self.dispatch('on_option_selection',*largs)
+            # else:
+            #     self.dispatch('on_selection',*largs)
+    # def on_purge_other_options(self,index):
+    #     data=self.data
+    #     for i,e in enumerate( self.data ):
+    #         if i!=index:
+    #             data[i]['option_selected']=False
+    #             data[i]['lcolor']=[0,0,0,0]
+    #         else:
+    #             data[i]['option_selected']=True
+    #             data[i]['lcolor']=self.option_selected_color
+    #         # print(data[i])
+    #     self.data=data
+
+    #     print('hell')
     def _does_it_fit(self,grid,cols):
         if grid.cols and len(grid.children)>1:
             # print('here')
@@ -3596,14 +3899,18 @@ class Artistlist(RecycleView):
                 return True
         else:
             return True
-    def __auto_fit(self,ins):
+    def _auto_fit(self,ins=None):
+        # print('autofiting')
+        # Clock.unschedule(self.__auto_fit)
+        ins=self
         # oins=ins
         # try:
         grid=ins.children[0]
 
         if not self._does_it_fit(grid,self.cols):
             self.cols-=1
-            self.__auto_fit(ins)
+            # self.__auto_fit(ins)
+            Clock.schedule_once(self._auto_fit)
         else:
             # if grid.cols:
             row_w=0
@@ -3643,70 +3950,6 @@ class Artistlist(RecycleView):
         #         row0_minw=0
         #         for i in range(min((self.cols+1,len(ins.children)))):
         #             row0_minw+=ins.children[i].minimum_width
-
-
-
-    def __init__(self,keyboard_scroll=True, **kwargs):
-        self.register_event_type('on_ref_press')
-        self.register_event_type('on_selection')
-        self.register_event_type('on_option_selection')
-        # self.register_event_type('on_purge_other_options')
-        
-
-        super(Artistlist, self).__init__(**kwargs)
-        # self.data=data
-        # on_width: self._auto_fit(root)
-        
-        self.layout_manager.bind(selected_nodes=self._select)
-
-        if self.cols==None and self.rows==None:
-            self.cols=3
-            self.children[0].bind(width= lambda *x:self._auto_fit(self) )
-            self.bind(data= lambda *x:self._auto_fit(self))
-
-
-            # self.width=self.width+.01
-            # self.on_width()
-            # self.bind(parent= lambda *x:self.children[0].do_layout())
-
-            # Clock.schedule_once(lambda dt:print(self.children[0]))
-            # self._auto_fit(self)
-        
-
-
-    def on_ref_press(self, refvalue):
-        # print(self,instance, refvalue)
-        pass
-    def _select(self,*largs):
-        # print(largs)
-        if largs[1]:
-            self.index_selected=largs[1]
-            
-            self.data_selected=[]
-            # oscount=0
-            for s in largs[1]:
-                # print(self.data[s])
-                # if s['option_selected']:
-                #     oscount+=1
-                self.data_selected.append(self.data[s])
-            self.dispatch('on_selection',*largs)
-            # if oscount:
-            #     self.dispatch('on_option_selection',*largs)
-            # else:
-            #     self.dispatch('on_selection',*largs)
-    # def on_purge_other_options(self,index):
-    #     data=self.data
-    #     for i,e in enumerate( self.data ):
-    #         if i!=index:
-    #             data[i]['option_selected']=False
-    #             data[i]['lcolor']=[0,0,0,0]
-    #         else:
-    #             data[i]['option_selected']=True
-    #             data[i]['lcolor']=self.option_selected_color
-    #         # print(data[i])
-    #     self.data=data
-
-    #     print('hell')
 
 
     def on_selection(self,*largs):
@@ -3750,6 +3993,7 @@ class Artistlist(RecycleView):
 
 
 
+        
 
 
 
@@ -4008,7 +4252,7 @@ class ProgressBarC(ProgressBar):
 #-----------------------------------------
 
 
-class LabelCheck(kvw.BoxLayoutB):
+class LabelCheck(kvw.BBoxLayout):
     active=BooleanProperty(CheckBox.active.defaultvalue)
     group=ObjectProperty(CheckBox.group.defaultvalue)
     label_args=ObjectProperty({})
@@ -4024,24 +4268,52 @@ class LabelCheck(kvw.BoxLayoutB):
         
         for k in ('active','background_checkbox_disabled_down','background_checkbox_disabled_normal',
             'background_checkbox_down','background_checkbox_normal','background_radio_disabled_down',
-            'background_radio_disabled_normal','background_radio_down','background_radio_normal','group'):
+            'background_radio_disabled_normal','background_radio_down','background_radio_normal','group','allow_no_selection'):
             _check_args[k]=kwargs.pop(k,getattr(CheckBox,k).defaultvalue)
         
 
         self._label=LabelB(**_label_args)
         self._check=CheckBox(size_hint_x=None,**_check_args)
-
+        # self._check.bind(state=lambda *x:print)
+        self._check.bind(active=lambda *x:self.setter('active')(*x))
 
         super(LabelCheck, self).__init__(**kwargs)
 
 
-        self._check.bind(active=lambda *x:self.setter('active')(*x))
+        
 
         self.add_widget(self._check)
         self.add_widget(self._label)
-
-    def on_active(self,ins,val):
+    # def _do_color_press(self,dt):
+    #     Clock.schedule_once(lambda dt:setattr(self,'bcolor',self.bcolor_down))
+    #     Clock.schedule_once(lambda dt:setattr(self,'bcolor',self.bcolor_normal),.1)
+    def on_active(self,ins,val,from_press=False):
         self._check.active=val
+        # if from_press:
+        #     Clock.schedule_once(lambda dt:setattr(self._check,'active',val))
+        # else:
+        #     self._check.active=val
+            
+        # # print(from_press)
+        if not from_press and val:
+            self.bcolor=self.bcolor_down
+            Clock.schedule_once(lambda dt:setattr(self,'bcolor',self.bcolor_normal),.1)
+            self.trigger_action()
+
+        # if val:
+        #     # Clock.unschedule(self._do_color_press)
+        #     # Clock.schedule_once(self._do_color_press)
+        #     # Clock.schedule_once(lambda dt:setattr(self,'bcolor',self.bcolor_down))
+        #     # Clock.schedule_once(lambda dt:setattr(self,'bcolor',self.bcolor_normal),.1)
+        #     pass
+        # else:
+        #     self.bcolor=self.bcolor_normal
+        # if val:
+        #     self.bcolor=self.bcolor_down
+            
+        # else:
+        #     self.bcolor=self.bcolor_normal
+
 
     def on_label_args(self,ins,val):
         for k,v in val.items():
@@ -4060,4 +4332,7 @@ class LabelCheck(kvw.BoxLayoutB):
         return self._check.width
     def _set_cwidth(self,val):
         self._check.width=val
+    def on_release(self):
+        self.on_active(self,True,from_press=True)
+        pass
     cwidth=kvw.AliasProperty(_get_cwidth,_set_cwidth,cache=True)

@@ -1,17 +1,21 @@
 from kivy.clock import Clock
+import types
 import time
 import re
 import os
 import re
+import sys
 from pathlib import Path
 from kivy.resources import resource_paths, resource_add_path, resource_remove_path
 from kivy.utils import platform
-
+from typing import List, Optional
+_did_auto_config=False
 class DotDict:
     def __init__(self,**kwargs):
         self._orignal=kwargs
         for k,v in kwargs.items():
             setattr(self,k,v)
+class PosHints(DotDict):
     def __getattr__(self,name):
         if name in self._orignal:
             return self._orignal[name]
@@ -32,7 +36,7 @@ class DotDict:
         hint.update(self._orignal[yp])
         # print(f"{hint=}")
         return hint
-pos_hints=DotDict(
+pos_hints=PosHints(
     center={"center_x":.5,"center_y":.5},
     center_x={"center_x":.5},
     center_y={"center_y":.5},
@@ -53,6 +57,57 @@ def callback_schedule(callback,timeout=0,*args,**kwargs):
 
 def app_schedule_get_call(key,method,*args,**kwargs):
     Clock.schedule_once(lambda dt:getattr(get_kvApp()[key],method)(*args,**kwargs))
+
+def create_derived_class(instance,**kwargs):
+    class base(instance.__class__):
+        pass
+    # setattr(base,'lcolor',instance.lcolor)
+    for k,v in kwargs.items():
+        setattr(base,k,v)
+    for k,v in instance.properties().items():
+        setattr(base,k,v)
+    return base
+
+# def create_derived_class(instance, class_name="Derived"):
+#     """
+#     Creates a new class derived from instance's class, with all attributes
+#     (including bound methods) from the instance transferred to the new class.
+#     """
+#     # Get the original class
+#     original_class = instance.__class__
+    
+#     # Collect all instance attributes that differ from class defaults
+#     modified_attrs = {}
+    
+#     for name, value in vars(instance).items():
+#         # Skip special attributes
+#         # if name.startswith('__') and name.endswith('__'):
+#         #     continue
+            
+#         # Get class value if it exists
+#         class_value = getattr(original_class, name, None)
+        
+#         # If attribute is different from class version or doesn't exist in class
+#         if not (isinstance(value, types.MethodType) and value.__self__ is instance) and \
+#            (not hasattr(original_class, name) or class_value != value):
+#             modified_attrs[name] = value
+    
+#     # Handle bound methods - we need to create unbound methods for the new class
+#     for name, method in vars(original_class).items():
+#         if isinstance(method, (types.FunctionType, classmethod, staticmethod)):
+#             # Get the potentially modified method from the instance
+#             instance_method = getattr(instance, name, None)
+#             if instance_method is not None and instance_method != method:
+#                 if isinstance(instance_method, types.MethodType):
+#                     # Convert bound method to unbound method for the new class
+#                     modified_attrs[name] = instance_method.__func__
+#                 else:
+#                     modified_attrs[name] = instance_method
+    
+#     # Create the new class
+#     new_class = type(class_name, (original_class,), modified_attrs)
+    
+#     return new_class
 
 
 def wait_result(callback,interval=.2):
@@ -220,18 +275,26 @@ def is_iterable(obj):
 #         _kvApp[0]=App.get_running_app()
 #     return _kvApp[0]
 
-def auto_config(size=(800,600),exit_on_escape=False,desktop=True,resizable=True,multitouch_emulation=False,**kwargs):
+
+def auto_config(size=(800,600),exit_on_escape=False,multisamples=2,desktop=True,resizable=True,multitouch_emulation=False,**kwargs):
+    global _did_auto_config
     from kivy.config import Config
     Config.set('kivy', 'exit_on_escape', int(exit_on_escape))
     Config.set('kivy', 'desktop', int(desktop))
     Config.set('graphics', 'resizable', int(resizable))
-    Config.set('graphics', 'multisamples', 0)
+    Config.set('graphics', 'multisamples', multisamples)
     if not multitouch_emulation:
         Config.set('input', 'mouse', 'mouse,disable_multitouch')
     if size[0]:
         Config.set('graphics', 'width', size[0])
     if size[1]:
         Config.set('graphics', 'height', size[1])
+
+    for k,v in kwargs.items():
+        for kk,vv in v.items():
+            Config.set(k, kk, vv)
+    _did_auto_config=True
+
 
     # if title:
     #     from kivy.app import App
@@ -438,6 +501,39 @@ class NamedColors:
             ans.add(k)
         return ans
 
+def darken_rgba(color, factor):
+    """
+    Darken an RGBA color by a specified factor.
+    
+    Args:
+        color: A tuple or list of 4 floats (r, g, b, a) in range [0, 1]
+        factor: A float between 0 and 1 where 0 is completely dark, 1 is no change
+    
+    Returns:
+        A tuple of (r, g, b, a) representing the darkened color
+    """
+    if not (0 <= factor <= 1):
+        raise ValueError("Factor must be between 0 and 1")
+    
+    r, g, b, a = color
+    return (r * factor, g * factor, b * factor, a)  # Alpha channel remains unchanged
+
+def brighten_rgba(color, factor):
+    """
+    Darken an RGBA color by a specified factor.
+    
+    Args:
+        color: A tuple or list of 4 floats (r, g, b, a) in range [0, 1]
+        factor: A float between 0 and 1 where 0 is completely dark, 1 is no change
+    
+    Returns:
+        A tuple of (r, g, b, a) representing the darkened color
+    """
+    if not (0 <= factor <= 1):
+        raise ValueError("Factor must be between 0 and 1")
+    
+    r, g, b, a = color
+    return (ci if ci<=1 else 1 for ci in (r + factor, g + factor, b + factor, a))  # Alpha channel remains unchanged
 
 colors=Colors=NamedColors()
 Fonts = CaseInsensitiveDict({
@@ -762,6 +858,1579 @@ mdi.prepend=('mdi-')
 # print('hell')
 
 
+class FileCategory:
+
+    def __init__(self, icon, extensions, size=20):
+        self._exts = set()
+        self._edef = {}
+        self._resolved = {}
+        self.size = size
+        self.icon = icon
+        for e in extensions:
+            if isinstance(e, str):
+                self._exts.add(e)
+            else:
+                self._edef[e[0]] = e[1:]
+                self._exts.add(e[0])
+
+    def __contains__(self, v):
+        return v in self._exts
+
+    def __getitem__(self, v):
+        try:
+            return self._edef[v]
+        except:
+            if v in self._exts:
+                return self.icon
+            else:
+                raise ValueError
+
+    def get(self, k):
+        iargs = self.__getitem__(k)
+        if iargs in self._resolved:
+            return self._resolved[iargs]
+        if isinstance(iargs, str):
+            ic = mdi(iargs, size=self.size)
+        else:
+            ic = mdi(iargs[0], color=iargs[1], size=self.size)
+        self._resolved[iargs] = ic
+        return ic
+
+
+class FileIconFinder:
+    _resolved = {}
+
+    def __init__(self, default_icon, size=None):
+        if size == None:
+            try:
+                size = re.search(r"size[ ]*=[ ]*[\d]+", default_icon).group()
+                # print(size)
+                size = int(re.search(r"[\d]+", size).group())
+            except:
+                pass
+        self.size = size
+        self.default_icon = default_icon
+        # Define your icon categories and subcategories here
+        self.icon_categories = {
+            "common_paths":FileCategory(
+                icon=('folder','#FFD96C'),
+                extensions=(
+                    ('folder','folder','#FFD96C'),
+                    ('user','account-box',"#0174CD"),
+                    ('home','home-account',"#0174CD"),
+                    ('root','harddisk','#E1E3E6'),
+                    ('storage','harddisk','#E1E3E6'),
+                    ('usb','usb-flash-drive','#E1E3E6'),
+                    ('desktop','monitor-dashboard','#1A93CA'),
+                    ('documents','file-document','#738FAC'),
+                    ('downloads','download',"#1CB49A"),
+                    ('pictures','image',"#148ED7"),
+                    ('videos','filmstrip',(1.0, 0.3, 0.7)),
+                    ('music','music-box',(0.5, 0.8, 1.0)),
+                    ('books','bookshelf','#BC8447'),
+
+                    )
+                ),
+            # Images
+            "raster_images": FileCategory(
+                extensions=(
+                    # Standard formats (lossy)
+                    ".jpg",
+                    ".jpeg",
+                    ".jpe",
+                    ".jfif",
+                    ".pjpeg",
+                    ".pjp",
+                    ".png",
+                    # Standard formats (lossless)
+                    ".bmp",
+                    ".dib",
+                    ".rle",
+                    # Web formats
+                    ".webp",
+                    ".avif",
+                    # Animation (single-layer)
+                    ".gif",
+                    ".apng",
+                    # Camera formats
+                    ".heic",
+                    ".heif",
+                    ".avci",
+                    ".avcs",
+                    # Raw formats (technically unprocessed but single-layer)
+                    ".raw",
+                    ".cr2",
+                    ".cr3",
+                    ".nef",
+                    ".arw",
+                    ".sr2",
+                    ".dng",
+                    ".raf",
+                    ".orf",
+                    ".rw2",
+                    ".pef",
+                    ".srf",
+                    ".dcr",
+                    ".kdc",
+                    ".mos",
+                    ".mrw",
+                    ".nrw",
+                    ".ptx",
+                    ".x3f",
+                    ".erf",
+                    # HDR/other
+                    ".hdr",
+                    ".exr",
+                    ".ppm",
+                    ".pgm",
+                    ".pbm",
+                    ".pnm",
+                    ".pfm",
+                ),
+                # icon=("image-outline",(0.95, 0.65, 0.25)),  # Simple image icon
+                icon=("image-outline","#148ED7"),  # Simple image icon
+            ),
+            "layered_images": FileCategory(
+                extensions=(
+                    # Professional editors
+                    ".psd",
+                    ".psb",
+                    ".psdt",  # Photoshop
+                    ".xcf",  # GIMP
+                    ".kra",  # Krita
+                    ".ora",  # OpenRaster
+                    ".clip",
+                    ".lip",  # Clip Studio Paint
+                    ".sai",  # PaintTool SAI
+                    ".csp",  # Clip Studio (older)
+                    ".afphoto",  # Affinity Photo
+                    ".procreate",  # Procreate (iOS)
+                    # TIFF/EXR (can be multilayer)
+                    ".tif",
+                    ".tiff",
+                    ".exr",
+                    # Other editors
+                    ".pdn",  # Paint.NET
+                    ".pix",  # PIXLR
+                    ".pde",  # Pixelmator
+                    ".webp",  # (Can have layers in some apps)
+                ),
+                # icon=("layers-triple",(0.85, 0.5, 0.95)),  # Stacked layers icon
+                # icon=("image-edit",(0.85, 0.5, 0.95)),  # Stacked layers icon
+                icon=("image-edit","#148ED7")
+            ),
+            "vector_images": FileCategory(
+                extensions=(
+                    # Standard vector formats
+                    ".svg",
+                    ".svgz",
+                    # Adobe formats
+                    ".ai",
+                    ".ait",
+                    ".eps",
+                    # ".pdf",  # (PDF can be vector-based)
+                    # Corel/CAD
+                    ".cdr",
+                    ".cmx",
+                    ".afdesign",
+                    ".fh",
+                    ".fh7",
+                    ".fh8",
+                    ".fh9",
+                    ".fh10",
+                    ".fh11",
+                    # Other editors
+                    ".sketch",
+                    ".fig",
+                    ".xd",
+                    ".epsf",
+                    ".ps",
+                    ".swf",
+                    ".wmf",
+                    ".emf",
+                    # # 3D vector formats
+                    # ".dxf",
+                    # ".dwg",
+                    # ".iges",
+                    # ".step",
+                ),
+                icon=("vector-arrange-above",(0.3, 0.8, 1.0)),  # Vector/path icon
+            ),
+            # CAD (Expanded)
+            "cad": FileCategory(
+                extensions=(
+                    ".dwg",
+                    ".dxf",
+                    ".stp",
+                    ".step",
+                    ".iges",
+                    ".igs",
+                    ".x_t",
+                    ".x_b",
+                    ".sldprt",
+                    ".sldasm",
+                    ".slddrw",
+                    ".prt",
+                    ".asm",
+                    ".drw",
+                    ".ipt",
+                    ".iam",
+                    ".idw",
+                    ".f3d",
+                    ".catpart",
+                    ".catproduct",
+                    ".cgr",
+                    ".3dxml",
+                    ".jt",
+                    ".par",
+                    ".psm",
+                    ".model",
+                    ".session",
+                    ".dlv",
+                    ".exp",
+                    ".plmxml",
+                    ".prt",
+                    ".neu",
+                    ".mf1",
+                    ".scdoc",
+                    ".skp",
+                    ".3dm",
+                    ".3ds",
+                    ".blend",
+                ),
+                # icon="vector-square",
+                icon=("cube-outline",(0.0, 0.75, 0.95)),
+            ),
+            # CAM & 3D Printing
+            "cam": FileCategory(
+                extensions=(
+                    ".gcode",
+                    ".nc",
+                    ".tap",
+                    ".cnc",
+                    ".ncc",
+                    ".dnc",
+                    ".eia",
+                    ".ptp",
+                    ".3mf",
+                    ".amf",
+                    ".stl",
+                    ".obj",
+                    ".ply",
+                    ".wrl",
+                    ".x3d",
+                    ".vrml",
+                    ".sla",
+                    ".slc",
+                    ".cl",
+                    ".ol",
+                    ".rol",
+                    ".inp",
+                    ".mtt",
+                    ".pcd",
+                    ".vda",
+                ),
+                icon=("printer-3d",(0.0, 0.7, 0.8)),
+            ),
+            # CAE & Simulation
+            "cae": FileCategory(
+                extensions=(
+                    ".inp",
+                    ".dat",
+                    ".odb",
+                    ".sim",
+                    ".fem",
+                    ".cae",
+                    ".ans",
+                    ".cdb",
+                    ".mud",
+                    ".unv",
+                    ".bdf",
+                    ".nas",
+                    ".pch",
+                    ".rst",
+                    ".rth",
+                    ".rfl",
+                    ".dyn",
+                    ".key",
+                    ".d3plot",
+                    ".mod",
+                    ".f06",
+                    ".frd",
+                    ".pch",
+                    ".mnf",
+                    ".op2",
+                    ".op4",
+                    ".wrl",
+                    ".pvtu",
+                    ".vtu",
+                    ".msh",
+                    ".cas",
+                    ".cgns",
+                ),
+                icon=("chart-line",(0.4, 0.7, 1.0)),
+            ),
+            
+            # PLM & PDM
+            "plm": FileCategory(
+                extensions=(
+                    ".wgm",
+                    ".wht",
+                    ".whtx",
+                    ".whtxx",
+                    ".whtxxx",
+                    ".whtxxxx",
+                    ".whtxxxxx",
+                    ".whtxxxxxx",
+                    ".whtxxxxxxx",
+                    ".whtxxxxxxxx",
+                    ".whtxxxxxxxxx",
+                    ".whtxxxxxxxxxx",
+                ),
+                icon=("database-cog",(0.2, 0.6, 0.8)),
+            ),
+            # Mesh & Point Cloud
+            "mesh": FileCategory(
+                extensions=(
+                    ".ply",
+                    ".pcd",
+                    ".xyz",
+                    ".pts",
+                    ".ptx",
+                    ".las",
+                    ".laz",
+                    ".e57",
+                    ".obj",
+                    ".fbx",
+                    ".3ds",
+                    ".dae",
+                    ".off",
+                    ".smf",
+                    ".wrl",
+                    ".x3d",
+                    ".stl",
+                    ".3mf",
+                    ".amf",
+                    ".vrml",
+                    ".iv",
+                    ".vtu",
+                    ".msh",
+                    ".mesh",
+                    ".med",
+                    ".bdf",
+                    ".nas",
+                    ".unv",
+                    ".neu",
+                    ".mf1",
+                    ".scdoc",
+                    ".3dm",
+                ),
+                icon=("grid",(0.6, 0.6, 1.0)),
+            ),
+            # Documents (General)
+            "documents": FileCategory(
+                extensions=(
+                    ".doc",
+                    ".docx",
+                    ".odt",
+                    ".rtf",
+                    ".tex",
+                    ".wpd",
+                    ".pages",
+                    ".fodt",
+                    ".dot",
+                    ".dotx",
+                    ".docm",
+                    ".dotm",
+                    ".odm",
+                    ".ott",
+                    ".stw",
+                    ".sxw",
+                    ".uot",
+                    ".vor",
+                    ".wps",
+                    ".wpt",
+                    # ".xml",
+                    ".wri",
+                    ".kwd",
+                    ".abw",
+                    ".zabw",
+                    # ".csv",
+                    # ".tsv",
+                    # ".txt",
+                    ".md",
+                    ".markdown",
+                    ".rst",
+                    (".org","file-document",'#77AA99'),
+                    
+                ),
+                icon=("file-document",(0.3, 0.6, 0.95)),
+            ),
+            # PDFs
+            "pdfs": FileCategory(
+                extensions=(
+                    ".pdf",
+                    ".fdf",
+                    ".xfdf",
+                    ".pdx",
+                    ".pd",
+                    ".pmd",
+                    # PDF-like
+                    ".ai",
+                    ".indd",
+                ),
+                icon=("file-document",(1.0, 0.3, 0.3)),
+            ),
+            # Spreadsheets
+            "spreadsheets": FileCategory(
+                extensions=(
+                    ".xls",
+                    ".xlsx",
+                    ".ods",
+                    ".csv",
+                    ".tsv",
+                    ".fods",
+                    ".xlt",
+                    ".xltx",
+                    ".xlsm",
+                    ".xltm",
+                    ".xlw",
+                    ".xlr",
+                    ".numbers",
+                    ".gnumeric",
+                    ".uos",
+                    ".sxc",
+                    ".stc",
+                    ".sdc",
+                    ".dif",
+                    ".slk",
+                    ".prn",
+                    ".dbf",
+                    ".qpw",
+                    ".wb1",
+                    ".wb2",
+                    ".wb3",
+                    ".123",
+                    ".wk1",
+                    ".wk3",
+                    ".wk4",
+                    ".wks",
+                    ".wq1",
+                    ".wq2",
+                    ".xlk",
+                    ".xlsb",
+                    ".xlam",
+                    ".xla",
+                    ".xll",
+                    ".xlm",
+                ),
+                icon=("file-table",(0.3, 0.85, 0.5)),
+            ),
+            # Presentations
+            "presentations": FileCategory(
+                extensions=(
+                    ".ppt",
+                    ".pptx",
+                    ".odp",
+                    ".key",
+                    ".fodp",
+                    ".pot",
+                    ".potx",
+                    ".pps",
+                    ".ppsx",
+                    ".pptm",
+                    ".potm",
+                    ".ppsm",
+                    ".sxi",
+                    ".sti",
+                    ".sxd",
+                    ".std",
+                    ".show",
+                    ".shw",
+                    ".prz",
+                    ".pez",
+                    ".odg",
+                    ".otp",
+                    ".uop",
+                    ".wmf",
+                    ".emf",
+                    ".gslides",
+                    ".nb",
+                    ".pez",
+                    ".thmx",
+                    ".ppam",
+                    ".pptx",
+                    ".ppa",
+                ),
+                icon=("shape",(1.0, 0.5, 0.4)),
+            ),
+            'plugins': FileCategory(
+                extensions=(
+                    '.vsix',
+                    ),
+                icon=('puzzle',(.8,.8,.8))
+                ),
+            'disk_image_archives': FileCategory(
+                extensions=(
+                    # CD/DVD/Blu-ray Images
+                    '.iso', '.bin', '.cue', '.mdf', '.mds', '.img', '.ccd', '.sub', '.nrg',
+                    # # Floppy/Virtual Disk Images
+                    # '.dmg', '.toast', '.vfd', '.ima', '.dsk', '.vhd', '.vhdx', '.vdi', '.vmdk',
+                    # # Game Console Images
+                    # '.nds', '.3ds', '.cia', '.cci', '.cso', '.gb', '.gba', '.n64', '.sfc', '.smc',
+                    # # Forensic/System Images
+                    # '.dd', '.raw', '.aff', '.afm', '.afd', '.e01', '.l01', '.s01', '.vmdk', '.vmem',
+                    # Optical Disc Formats
+                    '.b5t', '.b6t', '.bwt', '.cdi', '.dmg', '.dmgpart', '.dvdr', '.gi', '.pdi',
+                    # Legacy Formats
+                    '.ashdisc', '.daa', '.fcd', '.gcd', '.gi', '.p01', '.pqi', '.udf', '.xmd'
+                ),
+                icon=('disc',(0.65, 0.75, 0.9))
+            ),
+            
+            # Archives
+            "archives": FileCategory(
+                extensions=(
+                    ".rar",
+                    (".zip","folder-zip",(0.8, 0.6, 0.3)),
+                    ".7z",
+                    ".tar",
+                    ".gz",
+                    ".bz2",
+                    ".xz",
+                    # ".iso",
+                    ".dmg",
+                    # ".pkg",
+                    ".deb",
+                    ".rpm",
+                    ".cab",
+                    # ".msi",
+                    # ".apk",
+                    # ".jar",
+                    ".war",
+                    ".ear",
+                    ".sar",
+                    ".a",
+                    ".ar",
+                    ".cpio",
+                    ".shar",
+                    ".lbr",
+                    ".mar",
+                    ".sbx",
+                    ".bz",
+                    ".lz",
+                    ".lzma",
+                    ".lzo",
+                    ".rz",
+                    ".sfark",
+                    ".sz",
+                    ".xz",
+                    ".z",
+                    ".Z",
+                    ".zst",
+                    ".zipx",
+                    ".zz",
+                    ".arc",
+                    ".ark",
+                    ".cdx",
+                    ".ha",
+                    ".hki",
+                    ".ice",
+                    ".pak",
+                    ".pit",
+                    ".sit",
+                    ".sitx",
+                    ".sqx",
+                    ".tar.gz",
+                    ".tgz",
+                    ".tbz2",
+                    ".tlz",
+                    ".txz",
+                    ".tzst",
+                    ".uc2",
+                    ".uha",
+                    ".wim",
+                    ".xar",
+                    ".zoo",
+                    ".zip",
+                    ".zpaq",
+                    ".zz",
+                ),
+                icon=("zip-box",(0.8, 0.6, 0.3)),
+            ),
+            # Shortcuts & Links
+            "shortcuts": FileCategory(
+                extensions=(
+                    (".url",'link-variant',(0.9, 0.9, 0.9)),
+                    ".lnk",
+                    ".desktop",
+                    ".webloc",
+                    ".alias",
+                    ".appref-ms",
+                    ".website",
+                    ".bkf",
+                    ".favorite",
+                    ".library-ms",
+                ),
+                icon=("open-in-new",(0.9, 0.9, 0.9)),
+            ),
+            # Add more categories as needed...
+            # (Previous categories for audio, video, code, etc. can be included similarly)
+            "audio": FileCategory(
+                extensions=(
+                    ".mp3",
+                    ".wav",
+                    ".aiff",
+                    ".aif",
+                    ".flac",
+                    ".alac",
+                    ".ogg",
+                    ".wma",
+                    ".aac",
+                    ".m4a",
+                    ".opus",
+                    ".ac3",
+                    ".amr",
+                    ".au",
+                    ".mid",
+                    ".midi",
+                    ".kar",
+                    ".rmi",
+                    ".xm",
+                    ".mod",
+                    ".s3m",
+                    ".it",
+                    ".mtm",
+                    ".umx",
+                    ".mo3",
+                    ".spx",
+                    ".tta",
+                    ".ape",
+                    ".wv",
+                    ".dts",
+                    ".dsd",
+                    ".dsf",
+                    ".mka",
+                    ".webm",
+                    ".m3u",
+                    ".pls",
+                    ".asx",
+                    ".cue",
+                    ".aup",
+                    ".band",
+                    ".daw",
+                    ".ses",
+                    ".als",
+                    ".flp",
+                    ".ptf",
+                    ".rpp",
+                    ".logic",
+                    ".garageband",
+                    ".reason",
+                    ".npr",
+                    ".nms",
+                    ".nki",
+                    ".sf2",
+                    ".sfz",
+                    ".gig",
+                    ".dls",
+                    ".exs",
+                    ".kontakt",
+                    ".omnisphere",
+                    ".mx6",
+                    ".als",
+                    ".ableton",
+                    ".alp",
+                    ".adg",
+                    ".adv",
+                    ".agr",
+                    ".ams",
+                    ".cpr",
+                    ".dwp",
+                    ".npr",
+                    ".rpp",
+                    ".ptx",
+                    ".sng",
+                    ".sfl",
+                    ".sfap0",
+                    ".sfk",
+                    ".sfpack",
+                ),
+                icon=("file-music",(0.5, 0.8, 1.0)),
+            ),
+            "video": FileCategory(
+                extensions=(
+                    ".mp4",
+                    ".avi",
+                    ".mov",
+                    ".mkv",
+                    ".wmv",
+                    ".flv",
+                    ".webm",
+                    ".m4v",
+                    ".mpg",
+                    ".mpeg",
+                    ".3gp",
+                    ".3g2",
+                    ".m2ts",
+                    ".mts",
+                    ".ts",
+                    ".vob",
+                    ".ogv",
+                    ".divx",
+                    ".f4v",
+                    ".h264",
+                    ".m2v",
+                    ".m4p",
+                    ".m4v",
+                    ".mxf",
+                    ".nsv",
+                    ".rm",
+                    ".rmvb",
+                    ".svi",
+                    ".tod",
+                    ".trp",
+                    ".vp6",
+                    ".vp7",
+                    ".vp8",
+                    ".vp9",
+                    ".yuv",
+                    ".gifv",
+                    ".m1v",
+                    ".m2v",
+                    ".m4e",
+                    ".mj2",
+                    ".mpv",
+                    ".mpe",
+                    ".qt",
+                    ".ram",
+                    ".smk",
+                    ".swf",
+                    ".viv",
+                    ".y4m",
+                    ".264",
+                    ".265",
+                    ".hevc",
+                    ".av1",
+                    ".dav",
+                    ".gcs",
+                    ".ivf",
+                    ".k3g",
+                    ".mjp",
+                    ".mjpg",
+                    ".mod",
+                    ".moflex",
+                    ".mp4v",
+                    ".mse",
+                    ".mvc",
+                    ".mxg",
+                    ".nuv",
+                    ".pva",
+                    ".rcv",
+                    ".rcd",
+                    ".rec",
+                    ".rv",
+                    ".rrc",
+                    ".sdp",
+                    ".seq",
+                    ".sml",
+                    ".ssif",
+                    ".str",
+                    ".vro",
+                    ".xesc",
+                ),
+                icon=("file-video",(1.0, 0.3, 0.7)),
+            ),
+            # Engineering Documents
+            "engineering_docs": FileCategory(
+                extensions=(
+                    ".idw",
+                    ".dwt",
+                    ".ipj",
+                    ".idcl",
+                    ".idcx",
+                    ".dwf",
+                    ".dwfx",
+                    ".edrw",
+                    ".eprt",
+                    ".edrw",
+                    ".easm",
+                    ".p2s",
+                    ".p2a",
+                    ".p3s",
+                    ".p3a",
+                    ".p4s",
+                    ".p4a",
+                    ".pc3",
+                    ".pc4",
+                    ".pc5",
+                    # ".pdf",
+                    ".pln",
+                    ".prt",
+                    ".prw",
+                    ".psm",
+                    ".pwd",
+                    ".pwx",
+                    ".rpt",
+                    ".slddrw",
+                    ".slddrt",
+                    ".sldprt",
+                    ".sldasm",
+                    ".std",
+                    ".tpl",
+                    ".vda",
+                    ".vrml",
+                    ".wrl",
+                    ".xgl",
+                    ".zgl",
+                ),
+                icon=("file-cog",(0.1, 0.6, 0.85)),
+            ),
+            "virtualization": FileCategory(
+                extensions=(
+                    ".vmdk",
+                    ".vdi",
+                    ".vhd",
+                    ".vhdx",
+                    ".ova",
+                    ".ovf",
+                    ".nvram",
+                    ".vmem",
+                    ".vmsd",
+                    ".vmsn",
+                    ".vmss",
+                    ".vmtm",
+                    ".vmx",
+                    ".vmxf",
+                    ".pvm",
+                    ".hdd",
+                    ".qcow",
+                    ".qcow2",
+                    ".qed",
+                    ".vfd",
+                    ".vfd",
+                    ".vhd",
+                    ".avhd",
+                    ".avhdx",
+                    ".vsv",
+                    ".bin",
+                    ".iso",
+                    ".img",
+                    ".dmg",
+                    ".toast",
+                    ".nrg",
+                    ".daa",
+                    ".ima",
+                    ".dsk",
+                    ".hdd",
+                    ".hds",
+                    ".hdx",
+                    ".vmdk",
+                    ".vmem",
+                    ".vmsn",
+                    ".vmss",
+                    ".vmtm",
+                    ".vmx",
+                    ".vmxf",
+                    ".nvram",
+                    ".pvs",
+                    ".vbox",
+                    ".vbox-extpack",
+                ),
+                icon=("server",(0.4, 0.9, 0.8)),
+            ),
+            "fonts": FileCategory(
+                extensions=(
+                    ".ttf",
+                    ".otf",
+                    ".woff",
+                    ".woff2",
+                    ".eot",
+                    ".pfb",
+                    ".pfm",
+                    ".afm",
+                    ".dfont",
+                    ".sfd",
+                    ".bdf",
+                    ".pcf",
+                    ".ttc",
+                    ".fon",
+                    ".fnt",
+                    ".chr",
+                    ".suit",
+                    ".xfn",
+                    ".gf",
+                    ".pk",
+                    ".mf",
+                    ".tfm",
+                    ".vf",
+                    ".vpl",
+                    ".map",
+                    ".enc",
+                    ".cid",
+                    ".cef",
+                    ".otb",
+                    ".pfa",
+                    ".pcf.gz",
+                    ".ttx",
+                    ".ufo",
+                    ".svg",
+                    ".eot",
+                    ".woff",
+                    ".woff2",
+                ),
+                icon=("format-font",(1.0, 0.8, 0.4)),
+            ),
+            "ebooks": FileCategory(
+                extensions=(
+                    ".epub",
+                    ".mobi",
+                    ".azw",
+                    ".azw3",
+                    ".kfx",
+                    ".kpf",
+                    ".prc",
+                    ".fb2",
+                    ".ibooks",
+                    ".pdb",
+                    ".lit",
+                    ".chm",
+                    ".djvu",
+                    ".djv",
+                    ".pdf",
+                    ".oxps",
+                    ".xps",
+                    ".cbz",
+                    ".cbr",
+                    ".cb7",
+                    ".cbt",
+                    ".cba",
+                    ".ceb",
+                    ".pdg",
+                    ".tr2",
+                    ".tr3",
+                    ".snb",
+                    ".xeb",
+                    ".pep",
+                    ".baf",
+                    ".aeh",
+                    ".bok",
+                    ".dnl",
+                    ".ebk",
+                    ".edn",
+                    ".etd",
+                    ".flip",
+                    ".htmlz",
+                    ".imp",
+                    ".inf",
+                    ".kbk",
+                    ".lrf",
+                    ".lrx",
+                    ".man",
+                    ".mmp",
+                    ".opf",
+                    # ".pkg",
+                    ".ps",
+                    ".rtf",
+                    ".tk3",
+                    ".tpz",
+                    ".vbk",
+                    ".webz",
+                    ".zno",
+                    ".ztxt",
+                ),
+                icon=("book-open-variant",(0.7, 0.5, 0.95)),
+            ),
+            "temp": FileCategory(
+                extensions=(
+                    ".tmp",
+                    ".temp",
+                    ".bak",
+                    ".backup",
+                    ".old",
+                    ".new",
+                    ".part",
+                    ".crdownload",
+                    ".download",
+                    ".partial",
+                    ".swp",
+                    ".swo",
+                    ".swn",
+                    ".spl",
+                    ".lock",
+                    ".lck",
+                    ".pid",
+                    ".state",
+                    ".autosave",
+                    ".~",
+                    ".dmp",
+                    ".hprof",
+                    ".core",
+                    ".stackdump",
+                    ".crash",
+                    ".minidump",
+                    ".mdmp",
+                    ".wer",
+                    ".recycle",
+                    ".trash",
+                    ".pending",
+                    ".pending-rename",
+                    ".pending-delete",
+                    ".pending-move",
+                    ".pending-copy",
+                    ".pending-merge",
+                ),
+                icon=("file-clock-outline",(0.8, 0.8, 0.8)),
+            ),
+            "logs": FileCategory(
+                extensions=(
+                    ".log",
+                    ".txt",
+                    ".err",
+                    ".out",
+                    ".debug",
+                    ".info",
+                    ".warn",
+                    ".error",
+                    ".trace",
+                    ".audit",
+                    ".history",
+                    ".journal",
+                    ".dump",
+                    ".diag",
+                    ".report",
+                    ".crash",
+                    ".stacktrace",
+                    ".stderr",
+                    ".stdout",
+                    ".syslog",
+                    ".eventlog",
+                    ".evtx",
+                    ".etl",
+                    ".wevt",
+                    ".evt",
+                    ".evtx",
+                    ".evtc",
+                    ".evtl",
+                    ".evtm",
+                    ".evtr",
+                    ".evts",
+                    ".evtx",
+                    ".evt_",
+                    ".evtx_",
+                    ".evtc_",
+                    ".evtl_",
+                    ".evtm_",
+                    ".evtr_",
+                    ".evts_",
+                    ".evtx_",
+                ),
+                icon=("text-box",(0.7, 0.7, 0.7)),
+            ),
+            # General code
+            "code":FileCategory(
+                extensions=(
+                    ".ees"
+                    ),
+                icon=('file-code',(0.25, 0.8, 1.0))
+                ),
+            # Python
+            'python': FileCategory(
+                extensions=('.py', '.pyc', '.pyo', '.pyd', '.pyi', '.pyw', '.pyz', '.pyzw', '.pyt', '.whl', '.egg'),
+                icon=('language-python','#519ABA')
+            ),
+
+            # JavaScript/TypeScript
+            'javascript': FileCategory(
+                extensions=('.js', '.jsx', '.mjs', '.cjs', '.ts', '.tsx', '.mts', '.cts', '.es', '.es6', '.pac'),
+                icon='language-javascript'
+            ),
+
+            # Java/Kotlin/Scala (JVM)
+            'jvm': FileCategory(
+                extensions=('.java', '.class', '.jar', '.war', '.ear', '.jmod', '.jks', '.kt', '.kts', '.scala', '.sc'),
+                icon='language-java'
+            ),
+
+            # C/C++
+            'cpp': FileCategory(
+                extensions=('.c', '.h', '.cpp', '.hpp', '.cc', '.cxx', '.hxx', '.ii', '.inl', '.ipp', '.ixx', '.c++', '.h++', '.cu', '.cuh'),
+                icon='language-cpp'
+            ),
+
+            # Rust
+            'rust': FileCategory(
+                extensions=('.rs', '.rlib', '.rustc', '.toml'),  # Cargo.toml is included here
+                icon='language-rust'
+            ),
+
+            # Go
+            'go': FileCategory(
+                extensions=('.go', '.mod', '.sum', '.work'),
+                icon='language-go'
+            ),
+
+            # Ruby
+            'ruby': FileCategory(
+                extensions=('.rb', '.rbw', '.gemspec', '.rake', '.ru', '.erb', '.rbs'),
+                icon='language-ruby'
+            ),
+
+            # PHP
+            'php': FileCategory(
+                extensions=('.php', '.phtml', '.php3', '.php4', '.php5', '.php7', '.phps', '.phar', '.inc'),
+                icon='language-php'
+            ),
+
+            # Swift
+            'swift': FileCategory(
+                extensions=('.swift', '.swiftinterface', '.swiftmodule', '.swiftsourceinfo'),
+                icon='language-swift'
+            ),
+
+            # R
+            'r': FileCategory(
+                extensions=('.r', '.R', '.Rdata', '.Rds', '.Rda', '.Rhistory', '.Rprofile', '.Renviron'),
+                icon='language-r'
+            ),
+
+            # Haskell
+            'haskell': FileCategory(
+                extensions=('.hs', '.lhs', '.cabal', '.hsc'),
+                icon='lambda'
+            ),
+            # HTML
+            "html": FileCategory(
+                extensions=(
+                    ".html",
+                    ".htm",
+                    ".xhtml",
+                    ".shtml",
+                    ".jhtml",
+                    ".chtml",
+                    ".dhtml",
+                    ".mhtml",
+                ),
+                # icon=("web-box",(1.0, 0.6, 0.2)),
+                icon=('web','#0078D7')
+            ),
+            # CSS/Sass
+            "css": FileCategory(
+                extensions=(
+                    ".css",
+                    ".scss",
+                    ".sass",
+                    ".less",
+                    ".styl",
+                    ".pcss",
+                    ".postcss",
+                ),
+                icon=("language-css3",(0.3, 0.8, 1.0)),
+            ),
+            # Web Templates
+            "templates": FileCategory(
+                extensions=(
+                    ".ejs",
+                    ".pug",
+                    ".jade",
+                    ".hbs",
+                    ".handlebars",
+                    ".mustache",
+                    ".twig",
+                    ".liquid",
+                    ".njk",
+                ),
+                icon=("file-document-outline",(0.7, 0.9, 1.0)),
+            ),
+            # Package Managers
+            "packages": FileCategory(
+                extensions=(
+                    ".json",
+                    ".lock",
+                    ".toml",
+                    ".yaml",
+                    ".yml",
+                    ".xml",
+                    # ".ini",
+                    ".cfg",
+                    ".conf",
+                ),
+                icon=("package-variant",(0.95, 0.7, 0.3)),
+            ),
+            # Build Tools
+            "build": FileCategory(
+                extensions=(
+                    ".gradle",
+                    ".pom",
+                    ".build",
+                    ".bzl",
+                    ".bazel",
+                    ".cmake",
+                    ".makefile",
+                    ".mk",
+                    ".ninja",
+                ),
+                icon=("hammer-wrench",(0.8, 0.5, 0.2)),
+            ),
+            # CI/CD
+            "ci": FileCategory(
+                extensions=(
+                    ".yml",
+                    ".yaml",
+                    ".travis.yml",
+                    ".gitlab-ci.yml",
+                    ".circleci",
+                    ".drone.yml",
+                    ".appveyor.yml",
+                    ".azure-pipelines.yml",
+                ),
+                icon=("git",(0.4, 0.95, 0.7)),
+            ),
+            # SQL
+            "sql": FileCategory(
+                extensions=(
+                    ".sql",
+                    ".ddl",
+                    ".dml",
+                    ".pgsql",
+                    ".psql",
+                    ".plpgsql",
+                    ".plsql",
+                    ".pkb",
+                    ".pks",
+                    ".tab",
+                    ".udf",
+                    ".viw",
+                    ".prc",
+                    ".fnc",
+                    ".trg",
+                ),
+                icon=("database",(0.9, 0.7, 1.0)),
+            ),
+            # Shell Scripts
+            "shell": FileCategory(
+                extensions=(
+                    ".sh",
+                    ".bash",
+                    ".zsh",
+                    ".fish",
+                    ".ps1",
+                    ".psm1",
+                    ".psd1",
+                    ".bat",
+                    ".cmd",
+                    ".vbs",
+                ),
+                # icon=("console",(1.0, 1.0, 0.5)),
+                icon=("console",(1.0, 1.0, 1.0)),
+            ),
+            # Notebooks
+            "notebooks": FileCategory(
+                extensions=(
+                    ".ipynb",
+                    ".rmd",
+                    ".sc",
+                    ".sage",
+                    ".zcml",
+                    ".qlikview",
+                    ".qvw",
+                    ".twb",
+                    ".tde",
+                ),
+                icon=("notebook",(1.0, 0.6, 0.8)),
+            ),
+            # Assembly
+            "assembly": FileCategory(
+                extensions=(
+                    ".asm",
+                    ".s",
+                    ".S",
+                    ".inc",
+                    ".mac",
+                    ".lst",
+                    ".obj",
+                    ".o",
+                    ".ko",
+                ),
+                icon=("chip",(0.8, 0.3, 0.8)),
+            ),
+            # Embedded
+            "embedded": FileCategory(
+                extensions=(
+                    ".hex",
+                    ".bin",
+                    ".elf",
+                    ".map",
+                    ".ld",
+                    ".sv",
+                    ".v",
+                    ".vhdl",
+                    ".vhd",
+                    ".ucf",
+                    ".qsf",
+                    ".sdc",
+                    ".bit",
+                    ".mcs",
+                    ".pof",
+                ),
+                icon=("microcontroller",(0.4, 0.8, 0.5)),
+            ),
+            # Dotfiles/Configs
+            "config": FileCategory(
+                extensions=(
+                    ".env",
+                    ".gitignore",
+                    ".gitattributes",
+                    ".editorconfig",
+                    ".dockerignore",
+                    ".npmignore",
+                    ".htaccess",
+                    ".properties",
+                    ".reg",
+                ),
+                icon=("cog",(0.6, 0.85, 1.0)),
+            ),
+            # Containers/VMs
+            "containers": FileCategory(
+                extensions=(
+                    ".dockerfile",
+                    ".dockerignore",
+                    ".compose.yml",
+                    ".vagrantfile",
+                    ".box",
+                    ".ova",
+                    ".ovf",
+                ),
+                icon=("docker",(0.3, 0.95, 0.95)),
+            ),
+            "apps": FileCategory(
+                extensions=(
+                    # Windows
+                    ".exe",
+                    ".com",
+                    ".scr",
+                    ".cpl",
+                    ".msc",
+                    ".jar",
+                    ".appref-ms",
+                    ".wsf",
+                    ".ps1",
+                    ".psm1",
+                    # macOS/Linux
+                    ".app",
+                    ".run",
+                    ".out",
+                    ".elf",
+                    ".bin",
+                    ".so",
+                    ".dylib",
+                    ".bundle",
+                    ".sh",
+                    ".command",
+                    # Cross-platform
+                    ".py",
+                    ".rb",
+                    ".pl",
+                    ".lua",
+                    ".ahk",
+                    ".scpt",
+                    ".js",
+                    ".php",
+                    ".bat",
+                    ".cmd",
+                    ".vbs",
+                ),
+                icon=("application-export",(0.2, 0.9, 0.6)),  # or 'application' for a simpler icon
+            ),
+            "installers": FileCategory(
+                extensions=(
+                    # Windows
+                    ".msi",
+                    ".msix",
+                    ".msixbundle",
+                    ".appx",
+                    ".appxbundle",
+                    ".exe",
+                    ".msp",
+                    ".mst",
+                    # macOS
+                    ".dmg",
+                    (".pkg","package-variant","#CF925E"),
+                    ".mpkg",
+                    ".app",
+                    ".prefpane",
+                    ".kext",
+                    # Linux
+                    ".deb",
+                    ".rpm",
+                    ".snap",
+                    ".flatpak",
+                    ".AppImage",
+                    ".pacman",
+                    ".pkg.tar.zst",
+                    # Mobile
+                    ".apk",
+                    ".ipa",
+                    ".xap",
+                    ".appx",
+                    ".aab",
+                    # Generic
+                    ".zip",
+                    ".tar.gz",
+                    ".7z",
+                    ".iso",
+                    ".img",
+                ),
+                icon=("package-down",(0.8, 0.4, 0.8)),
+            ),
+            "system_libs": FileCategory(
+                extensions=(
+                    ".dll",
+                    ".so",
+                    ".dylib",
+                    ".a",
+                    ".lib",
+                    ".ko",
+                    ".sys",
+                    ".drv",
+                    ".ocx",
+                    ".vxd",
+                    ".efi",
+                    ".acm",
+                    ".ax",
+                    ".tsp",
+                    ".ime",
+                    ".cpl",
+                    ".mui",
+                    ".mun",
+                    ".nlp",
+                    ".scr",
+                    ".vbx",
+                    ".xll",
+                    ".olb",
+                    ".tlb",
+                    ".winmd",
+                ),
+                icon=("file-cog-outline",'#D4E7FC'),
+            ),
+            "disk_images": FileCategory(
+                extensions=(
+                    ".iso",
+                    ".img",
+                    ".dmg",
+                    ".toast",
+                    ".vfd",
+                    ".nrg",
+                    ".daa",
+                    ".bin",
+                    ".cue",
+                    ".ima",
+                    ".dsk",
+                    ".vhd",
+                    ".vhdx",
+                    ".avhd",
+                    ".vmdk",
+                    ".vdi",
+                    ".qcow",
+                    ".qcow2",
+                    ".hdd",
+                    ".hds",
+                    ".vfd",
+                    ".mem",
+                    ".dmp",
+                    ".hprof",
+                    ".core",
+                    ".crash",
+                    ".minidump",
+                    ".mdmp",
+                    ".raw",
+                    ".img",
+                ),
+                icon=("harddisk",(0.7, 0.7, 0.8)),
+            ),
+            "system_config": FileCategory(
+                extensions=(
+                    ".reg",
+                    ".inf",
+                    ".ini",
+                    ".cfg",
+                    ".conf",
+                    ".plist",
+                    ".json",
+                    ".xml",
+                    ".yaml",
+                    ".toml",
+                    ".log",
+                    ".tmp",
+                    ".bak",
+                    ".old",
+                    ".part",
+                    ".pid",
+                    ".lock",
+                    ".lck",
+                    ".swp",
+                    ".dmp",
+                    ".evtx",
+                    ".etl",
+                    ".syslog",
+                    ".journal",
+                    ".diag",
+                    ".report",
+                    ".crash",
+                    ".audit",
+                ),
+                icon=("cog-sync",(0.7, 0.7, 1.0)),
+            ),
+            "firmware": FileCategory(
+                extensions=(
+                    ".rom",
+                    ".bin",
+                    ".hex",
+                    ".uf2",
+                    ".dfu",
+                    ".cap",
+                    ".bio",
+                    ".fd",
+                    ".flash",
+                    ".eep",
+                    # ".pkg",
+                    ".bios",
+                    ".frm",
+                    ".fdt",
+                    ".dtb",
+                    ".aml",
+                    ".acpi",
+                    ".uefi",
+                    ".efi",
+                    ".tef",
+                    # ".pkg",
+                    ".rbf",
+                    ".bit",
+                    ".mcs",
+                ),
+                icon=("chip",(0.4, 0.4, 0.9)),
+            ),
+            "cursors": FileCategory(
+                icon=('button-cursor'),
+                extensions=('.cur')
+                )
+            
+        }
+        for v in self.icon_categories.values():
+            v.size = self.size
+
+    def get(self, v):
+        v = v.lower()
+        try:
+            return self._resolved[v]
+        except:
+            for k, cat in self.icon_categories.items():
+                if v in cat:
+                    ic = cat.get(v)
+                    self._resolved[v] = ic
+                    return ic
+            return self.default_icon
+
 
 def remove_duplicates_fast(lst):
     seen = set()        # Set to keep track of seen elements
@@ -813,6 +2482,82 @@ class BrowserHistory:
             return None
     def print(self):
         print(self.history)
+
+class NavigationHistory:
+    def __init__(self, max_size=50):
+        self.back_stack = []       # Stack for backward navigation
+        self.current = None        # Current location
+        self.forward_stack = []    # Stack for forward navigation
+        self.max_size = max_size   # Maximum history size
+        self.is_navigating = False # Flag to track navigation vs new visits
+    
+    def visit(self, location, is_navigation=False):
+        """Add a new location to history"""
+        if self.current == location:
+            return  # Don't do anything if same location
+        
+        if not is_navigation and self.current is not None:
+            # Only add to back stack if this is a new visit (not navigation)
+            self.back_stack.append(self.current)
+        
+        if not is_navigation:
+            # Clear forward stack only for new visits
+            self.forward_stack = []
+        
+        self.current = location
+        self.is_navigating = False
+        
+        # Enforce max size
+        if len(self.back_stack) > self.max_size:
+            self.back_stack.pop(0)
+    
+    def back(self):
+        """Go to previous location in history"""
+        if not self.can_go_back():
+            return None
+        
+        self.forward_stack.append(self.current)
+        self.current = self.back_stack.pop()
+        self.is_navigating = True
+        return self.current
+    
+    def forward(self):
+        """Go to next location in history"""
+        if not self.can_go_forward():
+            return None
+        
+        self.back_stack.append(self.current)
+        self.current = self.forward_stack.pop()
+        self.is_navigating = True
+        return self.current
+    
+    def can_go_back(self):
+        """Check if back navigation is possible"""
+        return len(self.back_stack) > 0
+    
+    def can_go_forward(self):
+        """Check if forward navigation is possible"""
+        return len(self.forward_stack) > 0
+    
+    def get_current(self):
+        """Get current location"""
+        return self.current
+    
+    def get_history_state(self):
+        """Get complete navigation state"""
+        return {
+            'back_stack': self.back_stack.copy(),
+            'current': self.current,
+            'forward_stack': self.forward_stack.copy(),
+            'can_go_back': self.can_go_back(),
+            'can_go_forward': self.can_go_forward()
+        }
+    
+    def clear(self):
+        """Clear all history"""
+        self.back_stack = []
+        self.current = None
+        self.forward_stack = []
 
 import random
 from collections import deque
@@ -899,6 +2644,76 @@ class PlaylistManager:
         print("Playlist Order:")
         for idx, track in enumerate(self.playlist_order, start=1):
             print(f"{idx}. {track}")
+
+def get_common_paths():
+    """Returns a list of common paths available on the current platform."""
+    paths = []
+    home = os.path.expanduser("~")
+    
+    # Root storage (varies by platform)
+    root = None
+    if sys.platform == "win32":
+        root = os.path.abspath(os.sep)  # Usually C:\
+    else:
+        root = os.path.abspath(os.sep)  # /
+    if root:
+        paths.append(root)
+    
+    # Platform-specific paths
+    platform_paths = {
+        "win32": {
+            "desktop": os.path.join(home, "Desktop"),
+            "documents": os.path.join(home, "Documents"),
+            "downloads": os.path.join(home, "Downloads"),
+            "images": os.path.join(home, "Pictures"),
+            "videos": os.path.join(home, "Videos"),
+            "music": os.path.join(home, "Music"),
+            "books": os.path.join(home, "Documents"),  # Windows doesn't have a standard Books folder
+        },
+        "darwin": {  # macOS
+            "desktop": os.path.join(home, "Desktop"),
+            "documents": os.path.join(home, "Documents"),
+            "downloads": os.path.join(home, "Downloads"),
+            "images": os.path.join(home, "Pictures"),
+            "videos": os.path.join(home, "Movies"),
+            "music": os.path.join(home, "Music"),
+            "books": os.path.join(home, "Library", "Containers", "com.apple.BKAgentService", "Data", "Documents", "iBooks"),
+        },
+        "linux": {
+            "desktop": os.path.join(home, "Desktop"),
+            "documents": os.path.join(home, "Documents"),
+            "downloads": os.path.join(home, "Downloads"),
+            "images": os.path.join(home, "Pictures"),
+            "videos": os.path.join(home, "Videos"),
+            "music": os.path.join(home, "Music"),
+            "books": os.path.join(home, "Documents"),  # Linux doesn't have a standard Books folder
+        }
+    }
+    
+    # Get paths for current platform
+    current_platform = sys.platform
+    platform_specific = platform_paths.get("win32" if current_platform == "win32" else "linux")  # Default to Linux-style for unknown platforms
+    
+    if current_platform == "darwin":
+        platform_specific = platform_paths["darwin"]
+    
+    # Add user home directory
+    paths.append(home)
+    
+    # Add platform-specific paths if they exist
+    for name, path in platform_specific.items():
+        if os.path.exists(path):
+            paths.append(path)
+    
+    # Remove duplicates while preserving order
+    # seen = set()
+    unique_paths = {root:'root',home:'home'}
+    for path in paths:
+        if path not in unique_paths:
+            # unique_paths.append(path)
+            unique_paths[path]=os.path.basename(path)
+    
+    return unique_paths
 
 # # Example usage:
 # playlist = PlaylistManager()

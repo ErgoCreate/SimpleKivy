@@ -1,5 +1,6 @@
 import sys
 import os
+import pathlib
 # package_path = os.path.abspath(os.path.join(os.path.dirname(__file__), '..'))
 # print(package_path)
 # os.environ['PYTHONPATH'] = package_path + os.pathsep + os.environ.get('PYTHONPATH', '')
@@ -31,10 +32,17 @@ def __mul__Widget(self,val):
         self.add_widget(val)
         return self
     # iadd+=1
+    pos_hint=getattr(self,'pos_hint',{})
+    # self.pos_hint={}
+    # print(pos_hint)
     if size_hint_y:
-        return BoxitH( self, val,k=NOTKEY)
+        return BoxitH( self, val,k=NOTKEY,pos_hint=pos_hint,
+            # lcolor='g'
+            )
     else:
-        return BoxitH( self, val,size='ychildren',k=NOTKEY)
+        return BoxitH( self, val,size='ychildren',k=NOTKEY,pos_hint=pos_hint,
+            # lcolor='g'
+            )
 
 def __div__Widget(self,val):
     # print(self.size,val.size,self.size_hint,val.size_hint)
@@ -47,10 +55,17 @@ def __div__Widget(self,val):
         self.add_widget(val)
         return self
     # iadd+=1
+    pos_hint=getattr(self,'pos_hint',{})
+    # self.pos_hint={}
+    # print(pos_hint)
     if size_hint_x:
-        return BoxitV( self, val,k=NOTKEY)
+        return BoxitV( self, val,k=NOTKEY,pos_hint=pos_hint,
+            # lcolor='g'
+            )
     else:
-        return BoxitV( self, val,size='xchildren',k=NOTKEY)
+        return BoxitV( self, val,size='xchildren',k=NOTKEY,pos_hint=pos_hint,
+            # lcolor='g'
+            )
 # setattr(Widget,'__mul__' , types.MethodType(__mul__Widget, Widget))
 setattr(Widget,'__mul__' , __mul__Widget)
 setattr(Widget,'__truediv__' , __div__Widget)
@@ -294,7 +309,8 @@ def _post_process_elements(self):
                     el.on_state(el,el.state)
         elif wtype in ('Playlist','Albumlist','Artistlist'):
             for kel in _post_elements[wtype]:
-                kel.bind(  on_ref_press=lambda instance, refvalue: self.trigger_event(f"{instance.id}/ref/{refvalue}")   )
+                if getattr(kel,'id',NOTKEY)!=NOTKEY:
+                    kel.bind(  on_ref_press=lambda instance, refvalue: self.trigger_event(f"{instance.id}/ref/{refvalue}")   )
         elif wtype=='TitleBar':
             for kel in _post_elements[wtype]:
                 kel.title.text=self.title
@@ -382,7 +398,8 @@ def _post_process_elements(self):
                     kel.bind(text=on_href)
 
                     # kel.on_event='on_ref_press',r'lambda instance, refvalue: self.trigger_event(f"{instance.id}/ref/{refvalue}")'
-                    kel.bind(  on_ref_press=lambda instance, refvalue: self.trigger_event(f"{instance.id}/ref/{refvalue}")   )
+                    if getattr(kel,'id',NOTKEY)!=NOTKEY:
+                        kel.bind(  on_ref_press=lambda instance, refvalue: self.trigger_event(f"{instance.id}/ref/{refvalue}")   )
         elif wtype=='SizeofChildren':
             for pair in _post_elements[wtype]:
                 el,sz=pair
@@ -715,12 +732,22 @@ def _ensure_bttn_not_draggable(children):
             if c.children:
                 _ensure_bttn_not_draggable(c.children)
 
+# class action:
+#     def __init__(self,target,*args,**kwargs):
+#         self.target=target
+#         self.args=args
+#         self.kwargs=kwargs
+#     def __call__(self,*_,**__):
+#         if hasattr(self.target,'__call__'):
+#             return self.target()(*self.args,**self.kwargs)    
+#         return self.target(*self.args,**self.kwargs)
+
 class action:
     def __init__(self,target,*args,**kwargs):
         self.target=target
         self.args=args
         self.kwargs=kwargs
-    def __call__(self):
+    def __call__(self,*_,**__):
         return self.target(*self.args,**self.kwargs)
 
 _post_actions_global=[]
@@ -734,20 +761,40 @@ if 'win' == platform.lower():
 
 class MyApp(App):
     window_is_maximized = BooleanProperty(False)
+    _top_widget=None
+    _subtop_widget=None
+    def _get_tw(self):
+        return self._top_widget
+    def _set_tw(self,v):
+        self._top_widget=v
+        return True
+    top_widget=kvw.AliasProperty(_get_tw,_set_tw)
+    def _get_stw(self):
+        return self._subtop_widget
+    def _set_stw(self,v):
+        self._subtop_widget=v
+        return True
+    subtop_widget=kvw.AliasProperty(_get_stw,_set_stw)
         
     def __init__(
         self,
         layout=[[]],
         title='MyApp',
-        event_manager=_event_manager,
+        event_manager=None,
         custom_titlebar=False,
         alpha=1,
         keep_on_top=False,
         layout_args={},
         icon='skdata/logo/simplekivy-icon-32.png',
         layout_class=None,
+        do_auto_config=True,
         **kwargs
         ):
+        if event_manager==None:
+            event_manager=_event_manager
+        if do_auto_config and not utils._did_auto_config:
+            auto_config()
+            pass
 
         self._is_windows = True if platform.lower()=='win' else False
         self.Clock=Clock
@@ -823,6 +870,8 @@ class MyApp(App):
 
         # self.bind(on_stop=lambda *args: self.event_manager(self,'__Close__'))
 
+        self._filebrowser={}
+
         self._nk=0
         self.ids={}
         self._ids={}
@@ -876,10 +925,11 @@ class MyApp(App):
         # else:
         #     self.event_manager=self._event_manager
 
-        self.top_widget = None
+        # self.top_widget = None
+        # self.subtop_widget = None
         self.remove_on_click = False
         def on_touch_down(instace, touch):
-            if self.remove_on_click:
+            if self.remove_on_click and touch.button in ('left','middle','right'):
                 self.remove_top_widget()
         self._layout.bind(on_touch_down=on_touch_down)
 
@@ -1168,6 +1218,21 @@ class MyApp(App):
         # Clock.schedule_once(lambda *args: self._layout.parent.add_widget(self.top_widget))
         self._layout.parent.add_widget(self.top_widget)
         self._layout.do_layout()
+
+    def remove_subtop_widget(self):
+        if self.subtop_widget:
+            self._layout.parent.remove_widget(self.subtop_widget)
+            self.subtop_widget = None
+    def _remove_subtop_widget(self,dt):
+        self.remove_subtop_widget()
+    def add_subtop_widget(self, widget, remove_on_click=True):
+        self.remove_subtop_widget()
+        self.remove_on_click = remove_on_click
+        self.subtop_widget = widget
+        # Clock.schedule_once(lambda *args: self._layout.parent.add_widget(self.subtop_widget))
+        self._layout.parent.add_widget(self.subtop_widget)
+        self._layout.do_layout()
+
     def infotip_schedule(self,*args,**kwargs):
         Clock.schedule_once(lambda dt:self.infotip(*args,**kwargs))
     def infotip_remove_schedule(self):
@@ -1412,11 +1477,140 @@ class MyApp(App):
     def schedule_func_once(self,func,*args,timeout=0,**kwargs):
         ans=Clock.schedule_once(lambda dt: func(*args,**kwargs),timeout=timeout)
 
+    def AskOpenFile(self,
+        initialdir='./',
+        filetypes=(
+                ('All files', '*.*'),
+                # ('PDF', '*.pdf'),
+            ),
+        callback=None,
+            **kw,
+        ):
+        _k='askopenfile'
+        if _k in self._filebrowser:
+            self._filebrowser[_k].root.filelist.filelist.deselect_all()
+            self._filebrowser[_k].root.input_selection.text=''
+            self._filebrowser[_k].open()
+            return
+
+        spinner_vals=[f'{ft[0]} ({ft[1]})' for ft in filetypes]
+        spinner_vals_d={}
+        for i,sv in enumerate(spinner_vals):
+            spinner_vals_d[sv]=[]
+            for ext in filetypes[i][1].split():
+                ext=ext.replace('*','').lower()
+                if ext=='.':
+                    continue
+                else:
+                    spinner_vals_d[sv].append(ext)
+        
+        spinner_filetypes=Spinner(spinner_vals[0],spinner_vals)
+        spinner_filetypes.vals_d=spinner_vals_d
+        def on_filetype(ins,t):
+            # print(ins.vals_d[t])
+            ins.root.file_types_filter=ins.vals_d[t]
+            ins.root.refresh()
+
+        spinner_filetypes.bind(text=on_filetype)
+
+        kvfilelist=Filelist(initialdir=initialdir,file_types_filter=spinner_vals_d[spinner_vals[0]],k=NOTKEY)
+        spinner_filetypes.root=kvfilelist
+        btn_open=ClearRoundB('Open')
+        btn_cancel=ClearRoundB('Cancel')
+        input_selection=InputDark(k=NOTKEY)
+        
+        kel=BoxitV(
+            kvfilelist,
+            SeparatorH(size=(1,1)),
+            BoxitH(
+                BoxitV(
+                    Label('File name:',halign='right',size='x100')*Void(size='x4')*input_selection,
+                    Fill(),
+                    spacing=8,
+                    ),
+                BoxitV(
+                    spinner_filetypes,
+                    btn_open*Void(size='x4')*btn_cancel,
+                    spacing=4,
+                    size_hint_max_x=300,
+
+                    ),
+                
+                size="y80",
+                spacing=4,
+                ),
+            spacing=4,
+            padding=4
+            )
+        kel.filelist=kvfilelist
+        kel.input_selection=input_selection
+        input_selection.root=kel
+        kvfilelist.root=kel
+        def on_file_select(ins,rv,values):
+            # ins.root.input_selection.text=f"{[rv.data[i]['meta'].name for i in values ]}"
+            fi=rv.data[values[0]]['meta']
+            if not fi.is_dir():
+
+                ins.root.input_selection.text=f"{fi.name}"
+                ins.root.input_selection.cursor=(0,0)
+
+        kvfilelist.bind(on_selection=on_file_select)
+        if callback==None:
+            callback=utils.do_nothing
+        kel.callback=callback
+
+        kel.btn_open=btn_open
+        btn_open.root=kel
+
+        pop=Popup(kel,title='Open',background='',background_color='#191919')
+        kel.popup=pop
+        pop.root=kel
+        btn_cancel.bind(on_release=lambda ins:pop.dismiss())
+
+        def on_btn_open(ins):
+            # print(ins.root.input_selection.text)
+            
+            filename=ins.root.input_selection.text
+            if filename:
+                 # and ins.root.callback
+                filename=os.path.join(f"{ins.root.filelist.current_directory.resolve().absolute()}",filename)
+                if not os.path.exists(filename):
+                    self.popup_message(f'{mdi('alert',color='yellow',size=30)} File not found:\n"{filename}"',auto_dismiss=1.5,title='Error',markup=True)
+                elif os.path.isdir(filename):
+                    ins.root.filelist.on_path( pathlib.Path(filename) )
+                    self.__call__(ins.root.input_selection,text='')
+                    return True
+                    # self.popup_message(f'{mdi('alert',color='yellow',size=30)} The filename is a directory:\n"{filename}"',auto_dismiss=1.5,title='Error',markup=True)
+                else:
+                    ins.root.callback(filename)
+                    ins.root.popup.dismiss()
+            
+
+        btn_open.bind(on_release=on_btn_open)
+        kvfilelist.bind(on_file_double_click=lambda ins,rv,i:btn_open.trigger_action())
+        pop.bind(on_dismiss=lambda *x:self.remove_top_widget())
+        input_selection.bind(on_text_validate=lambda *x:btn_open.trigger_action())
+        self._filebrowser[_k]=pop
+        pop.open()
+
+    def popup_message(self,msg='message',title="Message",auto_dismiss=-1,**kw):
+        pop=Popup(
+            title=title,
+            content=Label(msg,k=NOTKEY,**kw),
+            size_hint=(.3,.3),
+            k=NOTKEY)
+        if auto_dismiss>0:
+            pop.bind(on_open=lambda ins:Clock.schedule_once(ins.dismiss,auto_dismiss))
+        def on_dismiss(ins):
+            del ins
+        pop.bind(on_dismiss=on_dismiss)
+        pop.open()
+
     
     def askopenfile(self,
         filetypes=(
                 ('All files', '*.*'),
-                ('PDF', '*.pdf'),
+                # ('PDF', '*.pdf'),
             ),
         callback=None,
         **kw,
@@ -1444,6 +1638,91 @@ class MyApp(App):
         if callback and filename:
             callback(filename)
         return filename
+    def AskDirectory(self,
+        initialdir='./',
+        callback=None,
+            **kw,
+        ):
+        _k='askdirectory'
+        if _k in self._filebrowser:
+            self._filebrowser[_k].root.filelist.filelist.deselect_all()
+            self._filebrowser[_k].root.input_selection.text=''
+            self._filebrowser[_k].open()
+            return
+
+        kvfilelist=Filelist(initialdir=initialdir,k=NOTKEY,folders_only=True)
+        btn_open=ClearRoundB('Select folder',k=NOTKEY)
+        btn_cancel=ClearRoundB('Cancel',k=NOTKEY)
+        input_selection=InputDark(k=NOTKEY)
+        kel=BoxitV(
+            kvfilelist,
+            SeparatorH(size=(1,1)),
+            # BoxitH(
+                BoxitV(
+                    Label('File name:',halign='right',size='x100')*Void(size='x4')*input_selection,
+                    Fill(size_hint=(2,1))*BoxitH(btn_open,btn_cancel,spacing=4,size_hint_max_x=300),
+                    spacing=8,
+                    padding=4,
+                    size='y80'
+                    ),
+                # size="y80",
+                # spacing=4,
+                # ),
+            # spacing=4,
+            # padding=4
+            )
+        kel.filelist=kvfilelist
+        kel.input_selection=input_selection
+        input_selection.root=kel
+        kvfilelist.root=kel
+        def on_file_select(ins,rv,values):
+            # ins.root.input_selection.text=f"{[rv.data[i]['meta'].name for i in values ]}"
+            fi=rv.data[values[0]]['meta']
+            if fi.is_dir():
+                # self.__call__(ins.root.input_selection,text=f"{fi.name}",cursor=(0,0))
+                ins.root.input_selection.text=f"{fi.name}"
+                ins.root.input_selection.cursor=(0,0)
+
+        kvfilelist.bind(on_selection=on_file_select)
+        kel.callback=callback
+
+        kel.btn_open=btn_open
+        btn_open.root=kel
+
+        pop=Popup(kel,title='Open',background='',background_color='#191919')
+        kel.popup=pop
+        pop.root=kel
+        btn_cancel.bind(on_release=lambda ins:pop.dismiss())
+
+        def on_btn_open(ins):
+            # print(ins.root.input_selection.text)
+            
+            filename=ins.root.input_selection.text
+            if filename:
+                filename=os.path.join(f"{ins.root.filelist.current_directory.resolve().absolute()}",filename)
+                if not os.path.exists(filename):
+                    self.popup_message(f'{mdi('alert',color='yellow',size=30)} Directory not found:\n"{filename}"',auto_dismiss=1.5,title='Error',markup=True)
+                else:
+                    ins.root.callback(filename)
+                    ins.root.popup.dismiss()
+            else:
+                filename=os.path.join(f"{ins.root.filelist.current_directory.resolve().absolute()}")
+                if not os.path.exists(filename):
+                    self.popup_message(f'{mdi('alert',color='yellow',size=30)} Directory not found:\n"{filename}"',auto_dismiss=1.5,title='Error',markup=True)
+                else:
+                    ins.root.callback(filename)
+                    ins.root.popup.dismiss()
+            
+
+        btn_open.bind(on_release=on_btn_open)
+        # kvfilelist.filelist.bind(on_double_click=lambda *x:setattr(input_selection,'text',''))
+        kvfilelist.bind(on_directory=lambda *x:self.__call__(input_selection,text=''))
+        pop.bind(on_dismiss=lambda *x:self.remove_top_widget())
+        def on_input_validate(ins):
+            ins.root.btn_open.trigger_action()
+        input_selection.bind(on_text_validate=on_input_validate)
+        self._filebrowser[_k]=pop
+        pop.open()
     def askdirectory(self,
         callback=None,
         **kw,
@@ -1472,7 +1751,7 @@ class MyApp(App):
         initialfile='',
         filetypes=(
             ('All files', '*.*'),
-            ('PDF', '*.pdf'),
+            # ('PDF', '*.pdf'),
             
             ),
         callback=None,
@@ -1508,7 +1787,7 @@ class MyApp(App):
     def askopenfiles(self,
         filetypes=(
             ('All files', '*.*'),
-            ('PDF', '*.pdf'),
+            # ('PDF', '*.pdf'),
             
             ),
         callback=None,
@@ -1707,12 +1986,12 @@ class MyApp(App):
 
 
 
-def TEST_WIDGET(w):
+def TEST_WIDGET(w,event_manager=None):
     lyt=[[w]]
-    MyApp(layout=lyt).run()
+    MyApp(layout=lyt,event_manager=event_manager).run()
 
 @skwidget
-def Label(text='',k=None,focus_behavior=False,halign='center',size_behavior='normal',valign='middle',**kwargs):
+def Label(text='',k=None,focus_behavior=False,halign='center',size_behavior='normal',valign='middle',hover_highlight=False,**kwargs):
     # kwargs=_preproces(**kwargs)
     # global _future_elements, _future_bind
     # print(kwargs)
@@ -1727,6 +2006,11 @@ def Label(text='',k=None,focus_behavior=False,halign='center',size_behavior='nor
     else:
         # kel=kvw.LabelA(text=text,halign=halign,valign=valign,**kwargs)
         kvWd=kvw.LabelA
+
+    if hover_highlight:
+        class _(kvb.HoverHighlightBehavior,kvWd):
+            pass
+        kvWd=_
 
     kel=skivify_v2(kvWd,text=text,halign=halign,valign=valign,**kwargs,k=k)
 
@@ -1770,6 +2054,21 @@ def Label(text='',k=None,focus_behavior=False,halign='center',size_behavior='nor
     # kel.id=k
 
     kel.post='LabelLike'
+
+    # markup=getattr(kel,'markup',False)
+    # if markup:
+    #     def on_href(ins,text):
+    #         if '[href=' in text:
+    #             text = text.replace('[href=', '[color=1B95E0][u][ref=').replace(
+    #                 '[/href]', '[/ref][/u][/color]')
+    #         # return text
+    #         ins.text=text
+    #     on_href(kel,kel.text)
+    #     kel.bind(text=on_href)
+
+    #     # kel.on_event='on_ref_press',r'lambda instance, refvalue: self.trigger_event(f"{instance.id}/ref/{refvalue}")'
+    #     if getattr(kel,'id',NOTKEY)!=NOTKEY:
+    #         kel.bind(  on_ref_press=lambda instance, refvalue: self.trigger_event(f"{instance.id}/ref/{refvalue}")   )
 
     # _future_elements.append(kel)
     return kel
@@ -2104,6 +2403,392 @@ def Menu(widgets=[],
     return kel
 
 
+def AddMenu(main_widget,menu_widget,position_to='mouse',touch_up_buttons="right",menu_close_touch_buttons=("left","right"),on_pre_open=None):
+    '''
+    widget: Main widget.
+    menu_widget: Menu widget that will be attached to the main widget.
+    position_behavior: It can be any of ("main","main-center", "mouse").
+    '''
+    setattr(main_widget,'menu',menu_widget)
+    setattr(menu_widget,'_is_menu',True)
+    # setattr(widget,'_app',utils.get_kvApp())
+    # _app=utils.get_kvApp()
+    # setattr(widget,'kvWindow',kvWindow)
+
+    # def _ensure_keyboard(self):
+    #     self._keyboard=kvWindow.request_keyboard(
+    #         self._keyboard_closed, self, 'text')
+        
+    # def _keyboard_closed(self):
+    #     # print('My keyboard have been closed!')
+    #     self._keyboard.unbind(on_key_down=self._on_keyboard_down)
+    #     self._keyboard = None
+    # def _on_keyboard_down(self, keyboard, keycode, text, modifiers):
+    #     print(keycode)
+    # widget._ensure_keyboard=types.MethodType(_ensure_keyboard, widget) 
+    # widget._keyboard_closed=types.MethodType(_keyboard_closed, widget) 
+    # widget._on_keyboard_down=types.MethodType(_on_keyboard_down, widget) 
+    # widget._ensure_keyboard()
+    
+    def on_touch_up(self,touch):
+        _app=utils.get_kvApp()
+        
+        # print(f"{abs_pos = }",)
+        # print(dir(touch))
+        # for k in dir(touch):
+        #     if 'pos' in k:
+        #         print('-'*30)
+        #         print(k,"=",getattr(touch,k))
+
+
+
+        
+
+        if touch.button in touch_up_buttons:
+            # print(self.last_touch)
+            # touch_abs_pos=touch.to_absolute_pos(*touch.spos,*_app.kvWindow.size,0)
+            # self.touch_abs_pos=touch_abs_pos
+            # inside = self.collide_point(*self.to_widget(*touch_abs_pos))
+
+            # touch_abs_pos=touch.to_absolute_pos(*touch.spos,*_app.kvWindow.size,0)
+            # self.touch_abs_pos=touch_abs_pos
+            inside = self.collide_point(*self.to_widget(*_app.kvWindow.mouse_pos))
+
+            # try:
+            #     inside = self.collide_point(*self.parent.to_widget(*touch_abs_pos))
+            # except:
+            #     inside = self.collide_point(*self.to_widget(*touch_abs_pos))
+            
+            if inside:
+                # print('here',inside)
+                Clock.unschedule(self.show_menu)
+                Clock.schedule_once(self.show_menu)
+
+    def menu_on_touch_up(self,touch):
+        if touch.button in menu_close_touch_buttons:
+            inside = self.collide_point(*self.parent.to_widget(*touch.pos))
+            if inside:
+                _app=utils.get_kvApp()
+                Clock.unschedule(_app._remove_top_widget)
+                Clock.schedule_once(_app._remove_top_widget)
+                # Clock.schedule_once(lambda dt:self.close_menu)
+
+
+    def close_on_window(ins,v):
+        # print('close_on')
+        _app=utils.get_kvApp()
+        _app.kvWindow.unbind(size=close_on_window)
+        Clock.schedule_once(_app._remove_top_widget)
+        # Clock.schedule_once(lambda dt:main_widget.close_menu())
+    
+    if isinstance(position_to,str):
+        if position_to=='main':
+            def show_menu(self,*x):
+                if self.on_pre_open(self.menu)==False:
+                    return
+                _app=utils.get_kvApp()
+                
+                _app.kvWindow.bind(size=close_on_window)
+
+                lbl=self.menu
+                if lbl.size_hint_x==1:
+                    lbl.size_hint_max_x=self.width
+                ax,ay=self.to_window(*self.pos)
+                lbl.x=ax
+                lbl.y=ay-lbl.height
+
+                didx=False
+                didy=False
+
+                if lbl.y<0:
+                    lbl.y=lbl.y+lbl.height+self.height
+                    didy=True
+
+                
+                if lbl.x+lbl.width>_app.kvWindow.width:
+                    didx=True
+                    lbl.x=lbl.x-lbl.width+self.width
+                if lbl.x<1:
+                    lbl.x=1
+                _app.add_top_widget(lbl)
+        elif position_to=='main-center':
+            def show_menu(self,*x):
+                if self.on_pre_open(self.menu)==False:
+                    return
+                _app=utils.get_kvApp()
+                
+                _app.kvWindow.bind(size=close_on_window)
+
+                lbl=self.menu
+                if lbl.size_hint_x==1:
+                    lbl.size_hint_max_x=self.width
+                ax,ay=self.to_window(*self.pos)
+                lbl.x=ax-self.width*.75
+                lbl.y=ay-lbl.height
+
+                didx=False
+                didy=False
+
+                if lbl.y<0:
+                    lbl.y=lbl.y+lbl.height+self.height
+                    didy=True
+
+                
+                if lbl.x+lbl.width>_app.kvWindow.width:
+                    didx=True
+                    lbl.x=lbl.x-(_app.kvWindow.width-(lbl.x+lbl.width))-lbl.width+self.width
+                if lbl.x<1:
+                    lbl.x=1
+
+                _app.add_top_widget(lbl)
+        elif position_to in ('side'):
+            def show_menu(self,*x):
+                if self.on_pre_open(self.menu)==False:
+                    return
+                _app=utils.get_kvApp()
+                
+                _app.kvWindow.bind(size=close_on_window)
+
+                lbl=self.menu
+                if lbl.size_hint_x==1:
+                    lbl.size_hint_max_x=self.width
+
+                ax,ay=self.to_window(*self.pos)
+                
+                lbl.x=ax+self.width
+                
+                lbl.y=ay+self.height-lbl.height
+
+                didx=False
+                didy=False
+
+                # if lbl.y<0:
+                #     lbl.y=lbl.y+lbl.height+self.height
+                #     didy=True
+
+                
+                if lbl.x+lbl.width>_app.kvWindow.width:
+                    didx=True
+                    lbl.x=lbl.x-lbl.width-self.width-1
+                _app.add_top_widget(lbl)
+        elif position_to=='mouse':
+            def show_menu(self,*x):
+                if self.on_pre_open(self.menu)==False:
+                    return
+                _app=utils.get_kvApp()
+                
+                _app.kvWindow.bind(size=close_on_window)
+
+                lbl=self.menu
+                if lbl.size_hint_x==1:
+                    lbl.size_hint_max_x=self.width
+                ax,ay=_app.kvWindow.mouse_pos
+                lbl.pos=ax,ay
+                didx=False
+                didy=False
+
+                if lbl.y+lbl.height>_app.kvWindow.height:
+                    lbl.y=lbl.y-lbl.height-16
+                    didy=True
+                
+                if lbl.x+lbl.width>_app.kvWindow.width:
+                    lbl.x=lbl.x-lbl.width
+                    didx=True
+                if didy and not didx:
+                    lbl.x=lbl.x+16
+                _app.add_top_widget(lbl)
+        elif position_to=='over':
+            def show_menu(self,*x):
+                if self.on_pre_open(self.menu)==False:
+                    return
+                _app=utils.get_kvApp()
+                
+                _app.kvWindow.bind(size=close_on_window)
+
+                lbl=self.menu
+                
+                # lbl.pos=self.to_window(*self.pos)
+                # print(self.size)
+                # print(self.size_hint)
+                lbl.pos=self.pos
+                lbl.size_hint=None,None
+                lbl.size=self.size
+                
+                # lbl.size_hint=self.size_hint
+                _app.add_top_widget(lbl)
+    elif hasattr(position_to,'canvas'):
+        def show_menu(self,*x):
+            if self.on_pre_open(self.menu)==False:
+                return
+            _app=utils.get_kvApp()
+            
+            _app.kvWindow.bind(size=close_on_window)
+
+            lbl=self.menu
+            
+            # lbl.pos=self.to_window(*self.pos)
+            # print(self.size)
+            # print(self.size_hint)
+            lbl.pos=position_to.pos
+            lbl.size_hint=None,None
+            lbl.size=position_to.size
+            
+            # lbl.size_hint=self.size_hint
+            _app.add_top_widget(lbl)
+    else:
+        raise ValueError(f'Invalid value for position_behavior "{position_behavior}". It has to be any of ("main","mouse","parent")')
+
+    
+
+
+    if on_pre_open:
+        main_widget.on_pre_open=types.MethodType(on_pre_open, main_widget)
+    else:
+        def on_pre_open(self,menu):
+            pass
+        main_widget.on_pre_open=types.MethodType(on_pre_open, main_widget)
+    
+    
+    main_widget.show_menu=types.MethodType(show_menu, main_widget)
+    def close_menu(self):
+        _app=utils.get_kvApp()
+        _app.kvWindow.unbind(size=close_on_window)
+        Clock.schedule_once(_app._remove_top_widget)
+    main_widget.close_menu=types.MethodType(close_menu, main_widget)
+    main_widget.bind(on_touch_up=on_touch_up)
+    main_widget.menu.bind(on_touch_up=menu_on_touch_up)
+
+
+    return main_widget
+
+def AddSubMenu(main_widget,menu_widget,on_pre_open=None):
+    '''
+    widget: Main widget.
+    menu_widget: Menu widget that will be attached to the main widget.
+    position_behavior: It can be any of ("main", "mouse","parent").
+    '''
+    setattr(main_widget,'menu',menu_widget)
+    setattr(main_widget,'_main_menu',None)
+
+    def get_main_menu(self):
+        if self._main_menu:
+            return self._main_menu
+        elif getattr(self,'_is_menu',False):
+            self._main_menu=self
+            return self
+        else:
+            cw=self.parent
+            for i in range(50):
+                # print(cw)
+                if getattr(cw,'_is_menu',False):
+                    self._main_menu=cw
+                    return self._main_menu
+                else:
+                    cw=cw.parent
+
+
+    def on_enter(self):
+        # print('on_enter')
+        _app=utils.get_kvApp()
+        Clock.unschedule(self.show_menu)
+        Clock.schedule_once(self.show_menu)
+    def menu_on_touch_up(self,touch):
+        if touch.button in ('left','right'):
+            inside = self.collide_point(*self.parent.to_widget(*touch.pos))
+            if inside:
+                _app=utils.get_kvApp()
+                Clock.unschedule(_app._remove_subtop_widget)
+                Clock.schedule_once(_app._remove_subtop_widget)
+                Clock.unschedule(_app._remove_top_widget)
+                Clock.schedule_once(_app._remove_top_widget)
+
+
+    def close_on_window(ins,v):
+        if v==None:
+            _app=utils.get_kvApp()
+            _app.kvWindow.unbind(size=close_on_window)
+            _app.unbind(top_widget=close_on_window)
+            Clock.schedule_once(_app._remove_subtop_widget)
+    # def on_leave(self):
+    #     _app=utils.get_kvApp()
+    #     _app.kvWindow.unbind(size=close_on_window)
+    #     _app.unbind(top_widget=close_on_window)
+    #     Clock.schedule_once(_app._remove_subtop_widget)
+
+
+    def show_menu(self,*x):
+        if self.on_pre_open(self.menu)==False:
+            return
+        _app=utils.get_kvApp()
+        
+        _app.kvWindow.bind(size=close_on_window)
+        _app.bind(top_widget=close_on_window)
+
+        lbl=self.menu
+        ax,ay=self.to_window(*self.pos)
+
+
+        # print(self.parent,getattr(self.parent,'text','none'))
+        # print('self',getattr(self,'menu','None'))
+        # print('self.parent',getattr(self.parent,'menu','None'))
+
+        # print(f"{getattr(self,'_is_menu',False) = }")
+
+        # pax,pay=ax,ay
+        # pax,pay=self.to_window(*self.parent.pos)
+        # pax,pay=self.to_window(*self.menu._main.pos)
+
+        # print(self.get_main_menu())
+        
+        self.get_main_menu()
+        pax,pay=self.to_window(*self._main_menu.pos)
+        
+
+        # print(self,self.get_main_menu())
+        # print(self.pos,self.get_main_menu().pos)
+        
+        lbl.x=pax+self._main_menu.width
+
+
+        
+        lbl.y=ay+self.height-lbl.height
+
+        didx=False
+        didy=False
+        
+        if lbl.x+lbl.width>_app.kvWindow.width:
+            didx=True
+            lbl.x=lbl.x-lbl.width-self._main_menu.width-1
+        # print(lbl.x)
+        _app.add_subtop_widget(lbl)
+
+    if on_pre_open:
+        main_widget.on_pre_open=types.MethodType(on_pre_open, main_widget)
+    else:
+        def on_pre_open(self,menu):
+            pass
+        main_widget.on_pre_open=types.MethodType(on_pre_open, main_widget)
+    
+    main_widget.show_menu=types.MethodType(show_menu, main_widget)
+    main_widget.get_main_menu=types.MethodType(get_main_menu, main_widget)
+    # Clock.schedule_once(main_widget.set_main_menu)
+    # main_widget.bind(parent=main_widget.set_main_menu)
+
+
+    main_widget.bind(on_enter=on_enter,
+        # on_leave=on_leave
+        )
+    main_widget.menu.bind(on_touch_up=menu_on_touch_up)
+
+    def close_menu(self):
+        _app=utils.get_kvApp()
+        _app.kvWindow.unbind(size=close_on_window)
+        Clock.schedule_once(_app._remove_top_widget)
+    main_widget.close_menu=types.MethodType(close_menu, main_widget)
+
+    return main_widget
+
+
 @skwidget
 def ModalView(widgets=[],k=None,enable_events=False,on_event='on_pre_open',**kwargs):
     from kivy.uix.modalview import ModalView as wid
@@ -2351,7 +3036,7 @@ def LargeText(text='',k=None,focus_behavior=False,
 def Boxit(*widgets,k=None,base_cls=None,**kwargs):
     # kwargs=_preproces(**kwargs)
     if base_cls==None:
-        kvWd=kvw.BoxLayout
+        kvWd=kvw.BoxLayoutB
     else:
         kvWd=base_cls
     kel=skivify_v2(kvWd,k=k,**kwargs)
@@ -2361,6 +3046,13 @@ def Boxit(*widgets,k=None,base_cls=None,**kwargs):
     for w in widgets:
         kel.add_widget(w)
     # _future_elements.append(kel)
+    return kel
+@skwidget
+def Splitter(widget=None,k=None,sizable_from = 'right',**kwargs):
+    from kivy.uix.splitter import Splitter as kvWd
+    kel=skivify_v2(kvWd,k=k,sizable_from=sizable_from,**kwargs)
+    if widget:
+        kel.add_widget(widget)
     return kel
 
 @skwidget
@@ -2841,7 +3533,7 @@ def Titlebar(k='titlebar',size="y32",padding=[4,4],orientation='horizontal',**kw
 
     return kel
 
-Boxit=BoxitH
+# Boxit=BoxitH
 @skwidget
 def Pageit(*widgets,k=None,**kwargs):
     kel=skivify_v2(kvw.PageLayoutB,k=k,**kwargs)
@@ -3885,9 +4577,13 @@ def FlatToggleButtonAngle(text='button',angle=90,enable_events=True,k=None,on_ev
     return kel
 FlatTButtonAngle=FlatToggleButtonAngle
 @skwidget
-def FlatToggleButton(text='button',enable_events=False,k=None,on_event='on_state_down', **kwargs):
+def FlatToggleButton(text='button',enable_events=False,k=None,on_event='on_state_down',hover_highlight=False, **kwargs):
 
     kvWd=kvw.FlatTButton
+    if hover_highlight:
+        class _(kvb.HoverHighlightBehavior,kvWd):
+            pass
+        kvWd=_
 
     kel=kvWd(text=text,**kwargs)
     
@@ -3956,6 +4652,7 @@ def ListBox(
     enable_events=False,k=None,on_event='on_selection',
     keyboard_scroll=True,
     effect_cls='scroll', # damped, scroll, opacity, no
+    base_cls=None,
     **kwargs
     ):
     if isinstance(effect_cls,str):
@@ -3980,7 +4677,37 @@ def ListBox(
     
     return kel
 
+@skwidget
+def Rowlist(
+    data=[],
+    enable_events=False,k=None,on_event='on_selection',
+    keyboard_scroll=True,
+    effect_cls='scroll', # damped, scroll, opacity, no
+    base_cls=None,
+    cell_defaults={'text':'','halign':'left','valign':'middle','shorten':True,'padding':4,'markup':True,'font_name':'segoeui.ttf'},
+    **kwargs
+    ):
+    if isinstance(effect_cls,str):
+        match effect_cls:
+            case 'no':
+                from kivy.effects.scroll import ScrollEffect as effect_cls
+            case 'opacity':
+                from kivy.effects.scroll import OpacityScrollEffect as effect_cls
+            case 'damped':
+                from kivy.effects.scroll import DampedScrollEffect as effect_cls
+            case 'scroll':
+                from kivy.effects.scroll import ScrollEffect as effect_cls
+    kel=skivify_v2(kvw.Rowlist,
+        k=k,
 
+        viewclass_cell=kvw.LabelB,
+        cell_defaults=cell_defaults,
+        viewclass_base=kvw.RowSelectable,
+        
+        enable_events=enable_events,effect_cls=effect_cls,on_event=on_event,data=data,keyboard_scroll=keyboard_scroll,
+        **kwargs)
+    
+    return kel
 
 
 @skwidget
@@ -4159,6 +4886,16 @@ def Multiline(text='',enable_events=False,multiline=False,k=None,on_event='on_te
     locs['multiline']=True
 
     return Input(**locs)
+
+@skwidget
+def MultilineDark(text='',enable_events=False,multiline=False,k=None,on_event='on_text_validate', **kwargs):
+    locs=locals()
+    # print(locs)
+    kw=locs.pop('kwargs')
+    locs.update(kw)
+    locs['multiline']=True
+
+    return InputDark(**locs)
 
 @skwidget
 def CodeInput(text='',lexer='CythonLexer',style_name='default',rehighlight=None,k=None,enable_events=False,on_event='on_text_validate', **kwargs):
@@ -4998,12 +5735,12 @@ def PAW():
     kel=Boxit(size=(0,0),size_hint=(None,None),k=NOTKEY)
     Clock.schedule_once(lambda dt:get_kvApp().paw())
     return kel
-def Fill():
-    return Boxit(size=(0,0),size_hint=(1,1),k=NOTKEY)
-def SeparatorV(bcolor='gray',size=(2,1),size_hint=(None,1),**kwargs):
-    return Boxit(bcolor=bcolor,size=size,size_hint=size_hint,**kwargs)
-def SeparatorH(bcolor='gray',size=(1,2),size_hint=(1,None),**kwargs):
-    return Boxit(bcolor=bcolor,size=size,size_hint=size_hint,**kwargs)
+def Fill(size=(0,0),size_hint=(1,1),k=NOTKEY,**kwargs):
+    return Boxit(size=size,size_hint=size_hint,k=k,**kwargs)
+def SeparatorV(bcolor='gray',size=(2,1),size_hint=(None,1),k=NOTKEY,**kwargs):
+    return Boxit(bcolor=bcolor,size=size,size_hint=size_hint,k=k,**kwargs)
+def SeparatorH(bcolor='gray',size=(1,2),size_hint=(1,None),k=NOTKEY,**kwargs):
+    return Boxit(bcolor=bcolor,size=size,size_hint=size_hint,k=k,**kwargs)
 
 
 def QuickOk(msg='message',title='title'):
@@ -5040,7 +5777,821 @@ def QuickOkCancel(msg='message',title='title'):
     app.run()
     return app.ans
 
+class EventManager:
+    __events__={}
+    __rules__={}
+    __ev_to_rule__={}
+    __unhandled__=set()
+    def __init__(self):
+        self.__events__['__Start__']=self._nofunc
+        self.__events__['__Close__']=self._nofunc
+    def _nofunc(self,*l):
+        pass
+    def __test_rules__(self,ev):
+        try:
+            return self.__ev_to_rule__[ev]
+        except:
+            rans=None
+            for ri,calli in self.__rules__.items():
+                rans=ri(ev)
+                if rans:
+                    self.__ev_to_rule__[ev]=calli
+                    return calli
+            if not rans:
+                self.__unhandled__.add(ev)
+                return self._
 
+    def __call__(self,app,ev):
+        self.app=app
+        try:
+            callback=self.__events__[ev]
+        except:
+            if ev in self.__unhandled__:
+                callback=self._
+            else:
+                callback=self.__test_rules__(ev)
+        callback(app,ev)
+    def _(self,app,ev):
+        print('Unhandled:',ev)
+        pass
+    def event(self,event_name=None):
+        event_name=[event_name]
+        def event_decorator(func):
+
+            if event_name[0]==None:
+                event_name[0]=func.__name__
+            self.__events__[event_name[0]]=func
+            def wrapper(app,ev):
+                result=func(app,ev)
+                return result
+        return event_decorator
+    def start(self,func):
+        self.__events__['__Start__']=func
+        def wrapper(app,ev):
+            result=func(app,ev)
+            return result
+        return wrapper
+    def close(self,func):
+        fname='__Close__'
+        self.__events__[fname]=func
+        def wrapper(app,ev):
+            result=func(app,ev)
+            return result
+        return wrapper
+    def rule(self,rule_callback):
+        def rule_decorator(func):
+            self.__rules__[rule_callback]=func
+            def wrapper(app,ev):
+                result=func(app,ev)
+                return result
+        return rule_decorator
+    def unhandled(self,func):
+        self._=func
+        def wrapper(app,ev):
+            result=func(app,ev)
+            return result
+        return wrapper
+
+@skwidget
+def Filelist(
+        initialdir='./',
+        k=None,
+        folders_only=False,
+        file_types_filter=(),
+        **kw,
+        ):
+    '''
+    title - the title of the window
+    initialdir - the directory that the dialog starts in
+    initialfile - the file selected upon opening of the dialog
+    filetypes - a sequence of (label, pattern) tuples, ‘*’ wildcard is allowed
+    defaultextension - default extension to append to file (save dialogs)
+    multiple - when true, selection of multiple items is allowed
+    '''
+    # import pathlib
+    import psutil
+    cdir=pathlib.Path(initialdir).resolve()
+    def path2parts(path):
+        ans=[]
+        for pi,p in enumerate(path.parts):
+            ans.append(f"[b][ref={os.path.join(*path.parts[:pi],p)}]{p.replace('\\','')}[/ref][/b]")
+        # return ' / '.join(ans)
+        return mdi('chevron-right',color='w',size=20).join(ans)
+    def load_from_path(self,cdir):
+        cdir=cdir.resolve().absolute()
+        self.dispatch('on_directory',cdir)
+        data=[]
+        # folder_icon=mdi('folder',color=('#FFD96C'),size=25)
+        
+        files=[]
+        folders=[]
+        q=self.input_search.text.lower().strip()
+        if q:
+            check = lambda x:bool(q in x.name.lower())
+        else:
+            check=lambda x:True
+        
+        for fi in cdir.iterdir():
+            fi_stat=fi.stat()
+            if not check(fi):
+                continue
+            if fi.is_dir():
+
+                folders.append(
+                    dict(
+                        meta=fi,
+                        # lcolor='r',
+                        stat=fi_stat,
+                        height=35,size_hint_y=None,
+                        data=[
+                            dict(text=self.icons.get('folder'),width=30,size_hint_x=None,shorten=False), 
+                            dict(text=fi.name),
+                            # dict(size_hint_max_x=150,bcolor='',halign='right'),
+                            dict(text=f"{self.get_mtime(fi_stat)}",size_hint_max_x=130,bcolor='',halign='right'),
+                            dict(size_hint_max_x=100,bcolor='',halign='right'),
+                            # dict(text=f"{self.get_human_readable_size(fi)}",size_hint_max_x=100,bcolor='',halign='right'),
+                            ]
+                    )
+                )
+            elif not folders_only:
+                # icon=icons.get(fi.suffix.lower(),file_or_folder[0])
+                # fi._stat_result=fi.stat()
+                # setattr(fi,'_stat_result',fi.stat())
+                # fi_stat=fi.stat()
+                ext=fi.suffix.lower()
+                # print(ext)
+                if self.file_types_filter:
+                    if not ext in self.file_types_filter:
+                        continue
+
+                icon=self.icons.get(ext)
+                files.append(
+                    dict(
+                        meta=fi,
+                        stat=fi_stat,
+                        # size=(1,90),size_hint_y=None,
+                        height=35,size_hint_y=None,
+                        # lcolor='',
+                        data=[
+                            dict(text=icon,width=30,size_hint_x=None,shorten=False), 
+                            dict(text=fi.name),
+                            # dict(text=f"{fi.stat().st_size}"),
+                            # dict(text=f"{self.get_human_readable_size(fi)}"),
+                            dict(text=f"{self.get_mtime(fi_stat)}",size_hint_max_x=130,bcolor='',halign='right'),
+                            # dict(text=f"{self.get_KB_size(fi_stat)}",size_hint_max_x=100,bcolor='',halign='right'),
+                            dict(text=f"{self.get_human_readable_size(fi)}",size_hint_max_x=100,bcolor='',halign='right'),
+                            
+                            ]
+                    )
+                )
+
+        sort_mode=self.sort_menu.sort_mode
+        folder_mode=self.sort_menu.folder_mode
+        if folder_mode in (0,1):
+            if sort_mode==0:
+                fo,fi=folders,files
+            elif sort_mode==1:
+                fo,fi=reversed(folders),reversed(files)
+            elif sort_mode==3:
+                fo,fi=sorted(folders,key=lambda x:x['stat'].st_size,reverse=True),sorted(files,key=lambda x:x['stat'].st_size,reverse=True)
+            elif sort_mode==2:
+                fo,fi=sorted(folders,key=lambda x:x['stat'].st_size,reverse=False),sorted(files,key=lambda x:x['stat'].st_size,reverse=False)
+            elif sort_mode==4:
+                fo,fi=sorted(folders,key=lambda x:x['stat'].st_mtime,reverse=True),sorted(files,key=lambda x:x['stat'].st_mtime,reverse=True)
+            elif sort_mode==5:
+                fo,fi=sorted(folders,key=lambda x:x['stat'].st_mtime,reverse=False),sorted(files,key=lambda x:x['stat'].st_mtime,reverse=False)
+            if folder_mode==0:
+                data=list(fo)+list(fi)
+            else:
+                data=list(fi)+list(fo)
+        elif folder_mode==2:
+            if sort_mode==0:
+                data=sorted(folders+files,key=lambda x:x['meta'].name.lower())
+            elif sort_mode==1:
+                data=sorted(folders+files,key=lambda x:x['meta'].name.lower(),reverse=True)
+            elif sort_mode==3:
+                data=sorted(folders+files,key=lambda x:x['stat'].st_size,reverse=True)
+            elif sort_mode==2:
+                data=sorted(folders+files,key=lambda x:x['stat'].st_size,reverse=False)
+            elif sort_mode==4:
+                data=sorted(folders+files,key=lambda x:x['stat'].st_mtime,reverse=True)
+            elif sort_mode==5:
+                data=sorted(folders+files,key=lambda x:x['stat'].st_mtime,reverse=False)
+        
+        # print(f"{sort_mode=}")
+
+        # print(self.sort_menu.default)
+        # self.filelist.data=data
+        Clock.schedule_once(lambda dt:setattr(self.filelist,'data',data))
+        Clock.schedule_once(lambda dt:setattr(self.filelist,'scroll_y',1))
+        return data
+
+
+    label_path=Label('',markup=True,shorten_from='center',shorten=True,
+                    k=NOTKEY,halign='left',valign='middle',
+                    padding=(6,0,6,0),color='light grey',
+                    size_behavior='normal',
+                    # size='x100'
+                    # size_hint_x=None
+                    # size_hint_y=None
+                    # size_hint_x=None
+                    )
+
+    # click_box=Boxit(bcolor=(1,0,0,.2),size='x100')
+    # click_box=Label()
+    label_path_box=RoundButtonRelativeit(label_path,
+        bcolor_normal='#2C2C2C',
+        # bcolor_normal="#181818",
+        lcolor='',k=NOTKEY)
+    # def on_box_w(ins,w):
+    #     click_box.width=label_path_box.width-label_path.width
+    #     print(label_path.texture_size,label_path.width,label_path.text_size)
+    #     tw,th=label_path.texture_size
+    #     label_path.width=min((tw,ins.width-16))
+    #     label_path.text_size=label_path.width,None
+    #     click_box.width=label_path_box.width-label_path.width
+        # label_path.size_hint_max_x=w-16
+        # if label_path.text_size[0]!=None:
+        #     if label_path.text_size[0]>label_path.size_hint_max_x:
+        #         label_path.text_size[0]=label_path.size_hint_max_x
+    # kel.size_hint_x=None
+    # Clock.schedule_once(lambda dt: setattr(kel,'width',kel.texture_size[0]))
+    # Clock.schedule_once(lambda dt: setattr(kel,'text_size',(None, kel.height)))
+    # kel.bind(texture_size=lambda inst,siz:setattr(inst,'width',siz[0]))
+    # kel.bind(height=lambda inst,v:setattr(inst,'text_size',(None, v)))
+
+    # label_path_box.bind(width=on_box_w)
+    # def on_text(ins,t):
+    #     pass
+        # print(ins.texture_size)
+
+
+        # tw,th=label_path.texture_size
+        # print(tw,label_path.text_size[0])
+        # label_path.width=min((tw,label_path_box.width-16))
+        # label_path.text_size=label_path.width,None
+
+        # lambda *x: on_box_w(label_path_box,label_path_box.width)
+    # label_path.bind(texture_size=on_text)
+    path_input=InputDark()
+    def on_pre_open(*x):
+        setattr(path_input,'text',f"{label_path.path}")
+        path_input.do_cursor_movement('cursor_end')
+        path_input.focus=True
+    def on_text_validate(ins,*x):
+        npath=pathlib.Path(ins.text)
+        _app=utils.get_kvApp()
+        
+        if npath.is_dir() and npath.exists():
+            ins.root.on_path(npath)
+            
+        else:
+            otext=label_path.text
+            alert=mdi('alert',color='yellow',size=25)
+            # label_path.text=alert+f"[color=#A30027] Folder not found [/color]"+alert
+            _app(label_path,text=alert+f"[color=#A30027] Folder not found [/color]"+alert,halign='center')
+            _app.schedule_call_once(label_path,text=otext,halign='left',timeout=1.5)
+            # Clock.schedule_once(lambda dt:setattr(label_path,'text',otext),1)
+    def on_focus(ins,v):
+        _app=utils.get_kvApp()
+        _app.remove_top_widget()
+    path_input.bind(on_text_validate=on_text_validate)
+    path_input.bind(focus=on_focus)
+
+
+    AddMenu(
+        label_path_box,
+        path_input,
+
+        # Boxit(InputDark(),size='x200y30'),
+        position_to=label_path_box,touch_up_buttons=(),
+        on_pre_open=on_pre_open
+        )
+    label_path_box.bind(on_release=label_path_box.show_menu)
+    label_path.path=None
+    
+    # path2parts(cdir)
+
+    btn_up=ClearB(mdi('arrow-up'),size="32",k=NOTKEY)
+    btn_prev=ClearB(mdi('arrow-left'),size="32",k=NOTKEY,disabled=True)
+    btn_next=ClearB(mdi('arrow-right'),size="32",k=NOTKEY,disabled=True)
+    btn_hist=ClearB(mdi('chevron-down'),size="32",k=NOTKEY)
+    btn_ref=ClearB(mdi('refresh'),size="32",k=NOTKEY)
+
+    def on_btn_sort(ins):
+        _app=get_kvApp()
+        if not _app.top_widget:
+            ins.show_menu()
+        else:
+            _app.remove_top_widget()
+    btn_sort=ClearB(mdi('sort',size=20)+" Filter",size="x80",k=NOTKEY,on_press=on_btn_sort)
+
+    def pre_open_sort(ins,menu):
+        # print(menu)
+        l = kvw.ToggleButtonBehavior.get_widgets('_sortmethod')
+        ins.root.input_search.text=''
+
+        for i,li in enumerate(l):
+            # print(li.active)
+            if i==menu.sort_mode:
+                li.active=True
+            else:
+                li.active=False
+            # li.active=menu.default[i]
+
+        del l
+
+        fm = kvw.ToggleButtonBehavior.get_widgets('_folder')
+        for i,fmi in enumerate(fm):
+            if i==menu.folder_mode:
+                fmi.state="down"
+            else:
+                fmi.state="normal"
+        del fm
+    btn_apply_sort=ClearRoundButton('Apply',bcolor_normal=[.345, .345, .345, 1],lcolor='',r=10,size="y32",k=NOTKEY)
+    def on_btn_apply_sort(ins):
+        _app=get_kvApp()
+        l = kvw.ToggleButtonBehavior.get_widgets('_sortmethod')
+        # new_def=[1,0,0,0,0,0]
+        for i,li in enumerate(l):
+            # print(li.active)
+            if li.active:
+                ins.parent.sort_mode=i
+            # new_def[i]=li.active
+        # print(new_def)
+        del l
+
+        fm = kvw.ToggleButtonBehavior.get_widgets('_folder')
+        for i,fmi in enumerate(fm):
+            if fmi.state=='down':
+                ins.parent.folder_mode=i
+        del fm
+
+        # ins.parent.default=new_def
+        _app.remove_top_widget()
+        
+        # ins.root.btn_ref.trigger_action()
+        opath=ins.root.label_path.path
+        ins.root.label_path.path=None
+        ins.root.filelist.data=[]
+        Clock.schedule_once(lambda dt:ins.root.on_path(opath,from_sort=True),)
+
+        
+    btn_apply_sort.bind(on_release=on_btn_apply_sort)
+    input_search=InputDark(hint_text=f"Search {cdir.name}",k=NOTKEY)
+    sort_menu=BoxitV(
+            Label('Name',halign='left',padding=(4,0,0,0))*\
+            LabelCheck(mdi('sort-alphabetical-ascending')+" A-Z",active=True,markup=True,group='_sortmethod',allow_no_selection=False)*\
+            LabelCheck(mdi('sort-alphabetical-descending')+" Z-A",markup=True,group='_sortmethod',allow_no_selection=False),
+            Label('Size',halign='left',padding=(4,0,0,0))*\
+            LabelCheck(mdi('sort-reverse-variant')+" Smaller",markup=True,group='_sortmethod',allow_no_selection=False)*\
+            LabelCheck(mdi('sort-variant')+" Bigger",markup=True,group='_sortmethod',allow_no_selection=False),
+            Label('Date',halign='left',padding=(4,0,0,0))*\
+            LabelCheck(mdi('sort-calendar-ascending')+" Newer",markup=True,group='_sortmethod',allow_no_selection=False)*\
+            LabelCheck(mdi('sort-calendar-descending')+" Older",markup=True,group='_sortmethod',allow_no_selection=False),
+            Label('Folders',halign='left',padding=(4,0,0,0))*ToggleButton('First',state='down',group='_folder')*ToggleButton('Last',group='_folder')*ToggleButton('Mix',group='_folder'),
+            input_search,
+            # LabelCheck(mdi('sort-alphabetical-ascending')+" Name (A-Z)",active=True,markup=True,group='_sortmethod')*\
+            # LabelCheck(mdi('sort-alphabetical-descending')+" Name (Z-A)",markup=True,group='_sortmethod'),
+            # LabelCheck(mdi('sort-variant')+" Size (bigger)",markup=True,group='_sortmethod')*\
+            # LabelCheck(mdi('sort-reverse-variant')+" Size (smaller)",markup=True,group='_sortmethod'),
+            # LabelCheck(mdi('sort-calendar-ascending')+" Date (newer)",markup=True,group='_sortmethod')*\
+            # LabelCheck(mdi('sort-calendar-descending')+" Date (older)",markup=True,group='_sortmethod'),
+            btn_apply_sort,
+            size='x400y200',
+            bcolor='#2C2C2C',
+            spacing=4,
+            padding=4,
+            )
+    input_search.bind(on_text_validate=lambda x:btn_apply_sort.trigger_action())
+    sort_menu.sort_mode=0
+    sort_menu.folder_mode=0
+    # sort_menu.default=[1,0,0,0,0,0]
+
+    AddMenu(
+        btn_sort,
+        sort_menu,
+            touch_up_buttons=(
+                # "left","right"
+                ),
+            menu_close_touch_buttons=(),
+            position_to='main',
+            on_pre_open=pre_open_sort
+        )
+    
+    # def on_search(ins):
+    #     q=ins.text.lower()
+    #     if not q:
+    #         ins.root.filelist.data=ins.root.filelist.odata
+    #         return
+    #     odata=ins.root.filelist.data
+    #     ins.root.filelist.odata=odata
+    #     ndata=[]
+    #     for di in odata:
+    #         if q in di['meta'].name.lower():
+    #             ndata.append(di)
+    #     ins.root.filelist.data=ndata
+
+        
+    # input_search.bind(on_text_validate=on_search)
+
+
+    top_bar=BoxitH(
+                btn_prev,
+                btn_next,
+                btn_hist,
+                # ClearB(mdi('arrow-left'),size="32"),
+                # ClearB(mdi('arrow-right'),size="32"),
+                btn_up,
+                btn_ref,
+                label_path_box,
+                Void(size="x16"),
+                # input_search,
+                btn_sort,
+                size='y35'
+                )
+    # print()
+    icons=utils.FileIconFinder(mdi('file-question',size=25))
+
+    common_paths=utils.get_common_paths()
+    for cp0 in common_paths:
+        break
+    del common_paths[cp0]
+    cp0=pathlib.Path(cp0)
+
+
+    shortcut_list=[]
+    for cp,ctype in common_paths.items():
+        si=pathlib.Path(cp)
+        siname=si.name
+        if not siname:
+            siname=si.drive
+            if not siname:
+                siname='#Root'
+        # print(si.name)
+        shortcut_list.append(
+            dict(
+                # text=icons.get(si.name)+f' {si.name}',
+                text=icons.get(ctype)+f' {siname}',
+                markup=True,lcolor='',halign='left',valign='middle',
+                height=35,size_hint_y=None,
+                # selectable=True,do_highlight=True,
+                meta=si
+
+                )
+            )
+    refresh_storage=[
+    dict(
+        selectable=False,
+        buttonbehavior=True,
+        # text=f"&bl;{mdi('refresh',size=20)} Storage units&br;",
+        text=f"{mdi('refresh',size=20)} [u]Storage units[/u]",
+        # tooltip_text="Reload storage devices list",
+        # font_size=20,
+        markup=True,
+        halign='left',
+        valign='middle',
+                height=50,size_hint_y=None,
+                lcolor='',
+                on_release=lambda rv,i:rv.refresh(),
+        color='#4CCE70'
+                # on_touch_up=print,
+                # lcolor='dark grey',
+        # font_size=25
+        )
+    ]
+    shortcuts=ListBox(
+                    # shortcut_list+[
+                    # dict(bcolor_normal='gray',height=1,size_hint_y=None,bcolor_down='')
+                    # ]+storage_list,
+                    # shortcut_list+refresh_storage+storage_list,
+                    # size_hint_x=.2,
+                    width=135,
+                    size_hint_x=None,
+                    spacing=4,
+                    # size_hint_min_x=300,
+                    )
+    shortcuts.base_shortcuts=shortcut_list+refresh_storage
+    def shortcuts_refresh(self,*x):
+        storage_paths={}
+    
+        for d in psutil.disk_partitions():
+            dp=pathlib.Path(d.mountpoint).resolve()
+            # print(dp,cp0,dp==cp0)
+            # if cp0!=dp:
+            if 'removable' in d.opts:
+                storage_paths[dp]='usb'
+            else:
+                storage_paths[dp]='storage'
+        storage_list=[]
+        for si,ctype in storage_paths.items():
+            # si=pathlib.Path(cp)
+            siname=si.name
+            if not siname:
+                siname=si.drive
+                if not siname:
+                    siname='#Root'
+            # print(si.name)
+            storage_list.append(
+                dict(
+                    # text=icons.get(si.name)+f' {si.name}',
+                    text=icons.get(ctype)+f' ({siname})',
+                    markup=True,lcolor='',halign='left',valign='middle',
+                    height=35,size_hint_y=None,
+                    # selectable=True,do_highlight=True,
+                    meta=si
+
+                    )
+                )
+        self.data=self.base_shortcuts+storage_list
+
+    shortcuts.refresh=types.MethodType(shortcuts_refresh,shortcuts)
+    shortcuts.refresh()
+    # storages=ListBox(
+    #                 storage_list,
+    #                 size_hint_x=.25
+    #                 )
+
+    resize_shortcut=Splitter(
+                # storages,
+
+                shortcuts,
+                # size_hint_min_x=300,
+                # size_hint_x=.2,
+                width=135,
+                size_hint_x=None,
+
+                strip_size=8,
+                min_size=135
+                )
+    resize_shortcut.bind(height=lambda *x:setattr(shortcuts,'scroll_y',1))
+    bh=BoxitH()
+    filelist=Rowlist(spacing=2)
+    bh.add_widget(resize_shortcut)
+    bh.add_widget(filelist)
+    ################################################################################
+    # kel=BoxitV(
+    #         top_bar,
+    #         SeparatorH(size=(1,1)),
+    #         bh,
+    #     k=NOTKEY,
+
+    #     spacing=4,
+    #     )
+    class kvFilelist(kvw.BoxLayoutB):
+        orientation='vertical'
+        spacing=4
+        padding=[4,4,4,4]
+        file_types_filter=kvw.ListProperty([])
+        def __init__(self,**kwargs):
+            self.register_event_type('on_selection')
+            self.register_event_type('on_file_double_click')
+            self.register_event_type('on_directory')
+            super(kvFilelist,self).__init__(**kwargs)
+        def on_selection(self,rv,values):
+            pass
+        def on_file_double_click(self,rv,values):
+            pass
+        def on_directory(self,pathlib_path):
+            pass
+        def refresh(self):
+            self.btn_ref.trigger_action()
+        # def _get_dir(self):
+        #     return self.label_path.path
+        # def _set_dir(self,v):
+        #     self.on_path(v)
+        # path=kvw.AliasProperty(_get_path,_set_path)
+
+    
+    kel=skivify_v2(kvFilelist,k=k,file_types_filter=file_types_filter,**kw)
+    kel.add_widget(top_bar)
+    kel.add_widget( SeparatorH(size=(1,1)) )
+    kel.add_widget(bh)
+    ################################################################################
+
+
+
+    kel.icons=icons
+    kel.load_from_path=types.MethodType(load_from_path, kel)
+
+    kel.btn_sort=btn_sort
+    btn_sort.root=kel
+
+    kel.filelist=filelist
+    filelist.root=kel
+    kel.label_path=label_path
+    label_path.root=kel
+    kel.shortcuts=shortcuts
+    shortcuts.root=kel
+    kel.path_input=path_input
+    path_input.root=kel
+    input_search.root=kel
+    kel.input_search=input_search
+    btn_apply_sort.root=kel
+    kel.sort_menu=sort_menu
+    sort_menu.root=kel
+
+    def on_prev(ins):
+        # print(ins.root.history.get_history())
+        ins.root.on_path(ins.root.history.back(),is_navigation=True)
+        # print(ins.root.history.back())
+    def on_next(ins):
+        # n=ins.root.history.forward()
+        # print(n)
+        # if not n:
+        #     print(ins.root.history.get_history_state())
+        ins.root.on_path(ins.root.history.forward(),is_navigation=True)
+        # print(ins.root.history.get_history())
+    
+    def on_hist(ins):
+        _app=get_kvApp()
+        if ins.is_open:
+            ins.root.top_bar.close_menu()
+        else:
+            ins.root.top_bar.show_menu()
+    def on_hist_menu_parent(ins,parent):
+        # print(ins,parent)
+        if parent:
+            ins.root.btn_hist.is_open=True
+        else:
+            ins.root.btn_hist.is_open=False
+
+    def on_pre_hist_open(ins,menu):
+        # ins.text=mdi('chevron-up')
+        # print()
+        hs=ins.root.history.get_history_state()
+        full_stack=hs['back_stack']+hs['forward_stack']
+        if not full_stack:
+            return False
+        data=[]
+        _data=set()
+        for hi in reversed(full_stack):
+            if hi not in _data:
+                data.append(
+                    dict(
+                        text=f"{hi}",height=25,size_hint_y=None,meta=hi
+                        )
+                    )
+                _data.add(hi)
+        # print(data)
+        menu.data=data
+        menu.height=min((len(data)*25,150))
+        ins.root.btn_hist.is_open=True
+        ins.root.hist_list.scroll_y=1
+        # ins.root.hist_list.data=data
+        # Clock.schedule_once(lambda dt:setattr(ins.root.hist_list,'data',data))
+    def on_hist_selection(rv,ins,sel):
+        di=rv.data[sel[0]]['meta']
+        rv.root.on_path(di)
+
+    hist_list=ListBox(size_hint_y=None,size_hint_max_y=90,bcolor='#2C2C2C',bind=dict(on_selection=on_hist_selection))
+    hist_list.bind(parent=on_hist_menu_parent)
+    AddMenu(
+        top_bar,
+        hist_list,
+        position_to='main',
+        touch_up_buttons=('right',),
+        # menu_close_touch_buttons=(),
+        on_pre_open=on_pre_hist_open
+        )
+    def on_btn_refresh(self):
+        opath=self.root.label_path.path
+        self.root.label_path.path=None
+        self.root.filelist.data=[]
+        Clock.schedule_once(lambda dt:self.root.on_path(opath),)
+
+
+
+    btn_ref.root=kel
+    kel.btn_ref=btn_ref
+
+    btn_ref.bind(on_release=on_btn_refresh)
+
+    btn_hist.is_open=False
+    kel.hist_list=hist_list
+    hist_list.root=kel
+    kel.top_bar=top_bar
+    top_bar.root=kel
+    btn_next.root=kel
+    btn_prev.root=kel
+    btn_hist.root=kel
+    kel.btn_hist=btn_hist
+    kel.btn_next=btn_next
+    kel.btn_prev=btn_prev
+    btn_prev.bind(on_release=on_prev)
+    btn_next.bind(on_release=on_next)
+    btn_hist.bind(on_release=on_hist)
+
+    def update_nav_btns(self,dt):
+        self.btn_next.disabled=not self.history.can_go_forward()
+        self.btn_prev.disabled=not self.history.can_go_back()
+
+    def on_path(self,cdir,is_navigation=False,from_sort=False):
+
+        if not from_sort:
+            self.input_search.text=''
+
+        # print(cdir,self.label_path.path)
+        # print(f"{} {cdir.is_dir() = }")
+        # try:
+        #     cdir.stat()
+            
+        # except:
+        #     _app=get_kvApp()
+        #     _app.infotip(f'Access is denied: error')
+        if cdir and cdir!=self.label_path.path:
+            self.history.visit(cdir,is_navigation=is_navigation)
+            # print('path updated to',cdir)
+            self.current_directory=cdir
+            self.label_path.path=cdir
+            self.label_path.text=path2parts(cdir)
+            self.filelist.deselect_all()
+            self.load_from_path(label_path.path)
+            Clock.schedule_once(self.update_nav_btns)
+            
+    def on_ref_press(ins,v):
+        npath=pathlib.Path(v)
+        ins.root.on_path(npath)
+        # npath=pathlib.Path(v)
+        # if npath!=ins.path:
+        #     ins.path=npath
+        #     ins.root.on_path(ins.path)
+    label_path.bind(on_ref_press=on_ref_press)
+    def on_double_click(ins,index):
+        di=ins.data[index]
+        fi=di['meta']
+        if fi.is_dir():
+            ins.root.on_path(fi)
+        else:
+            ins.root.dispatch('on_file_double_click',ins,index)
+    def on_btn_up(ins):
+        # print(ins.root.label_path.path.parent)
+        cpath=ins.root.label_path.path
+        ins.root.on_path(cpath.parent)
+    btn_up.root=kel
+    btn_up.bind(on_release=on_btn_up)
+
+        # print(ins.data[index])
+    filelist.bind(on_double_click=on_double_click)
+    filelist.bind(on_selection=lambda rv,grid,values:kel.dispatch('on_selection',rv,values))
+
+    # filelist.bind(on_selection=kel.events)
+
+    kel.history=utils.NavigationHistory()
+    kel.history.visit(cdir)
+    kel.update_nav_btns=types.MethodType(update_nav_btns, kel)
+    kel.on_path=types.MethodType(on_path, kel)
+
+
+    def get_human_readable_size(self,path, decimal_places = 0):
+        """Return human-readable file size string.
+        
+        Args:
+            path: Path object to check
+            decimal_places: Number of decimal places to show
+            
+        Returns:
+            Formatted size string with appropriate unit
+        """
+        size_bytes = path.stat().st_size
+        
+        for unit in ['B', 'KB', 'MB', 'GB']:
+            if size_bytes < 1024:
+                return f"{size_bytes:.{decimal_places}f} {unit}"
+            size_bytes /= 1024
+        return f"{size_bytes:.{decimal_places}f} TB"
+    def get_KB_size(self,path_stat, decimal_places = 0):
+        """Return human-readable file size string.
+        
+        Args:
+            path: Path object to check
+            decimal_places: Number of decimal places to show
+            
+        Returns:
+            Formatted size string with appropriate unit
+        """
+        _stat_result=path_stat
+        size_bytes = _stat_result.st_size
+        # setattr(path,'_stat_result',_stat_result)
+        size_bytes/=1024
+        return f"{size_bytes:.{decimal_places}f} KB"
+    def get_mtime(self,path_stat):
+        t = time.localtime(path_stat.st_mtime)
+        # return f"{t.tm_mday:02d}/{t.tm_mon:02d}/{t.tm_year} {t.tm_hour:02d}:{t.tm_min:02d}:{t.tm_sec:02d}"
+        return f"{t.tm_mday:02d}/{t.tm_mon:02d}/{t.tm_year} {t.tm_hour:02d}:{t.tm_min:02d}"
+    kel.get_human_readable_size=types.MethodType(get_human_readable_size,kel)
+    kel.get_KB_size=types.MethodType(get_KB_size,kel)
+    kel.get_mtime=types.MethodType(get_mtime,kel)
+
+
+    def on_shortc_selection(rv,ins,indxs):
+        if indxs:
+            # print(rv.data[indxs[0]]['meta'])
+            rv.root.on_path(rv.data[indxs[0]]['meta'])
+    shortcuts.bind(on_selection=on_shortc_selection)
+    kel.on_path(cdir)
+
+    return kel
 
 if __name__ == '__main__':
     pass

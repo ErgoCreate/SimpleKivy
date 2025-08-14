@@ -16,18 +16,25 @@ class HoverHighlightBehavior(object):
     bcolor = ListProperty([0, 0, 0, 0])
     tooltip_text=StringProperty('')
     tooltip_args=ObjectProperty({})
+    _higlight_color=[1,1,1,1]
+    do_highlight=BooleanProperty(True)
 
     def __init__(self, **kwargs):
         self.kvWindow=utils.Window
+        self.bind(bcolor_down=self._set_highlight_color)
         self.register_event_type('on_enter')
         self.register_event_type('on_leave')
         to_parent=kwargs.pop('to_parent',False)
+        self.bcolor_normal=kwargs.get('bcolor_normal',kwargs.get('bcolor',self.bcolor_normal))
         self.kvWindow.bind(mouse_pos=self.on_mouse_pos_parent)
         # if to_parent:
         #     self.kvWindow.bind(mouse_pos=self.on_mouse_pos_parent)
         # else:
         #     self.kvWindow.bind(mouse_pos=self.on_mouse_pos_widget)
         super(HoverHighlightBehavior, self).__init__(**kwargs)
+        self._set_highlight_color(self,self.bcolor_down)
+    def _set_highlight_color(self,ins,bcolor_down):
+        self._higlight_color=utils.darken_rgba(bcolor_down,.66)
 
     def on_mouse_pos_widget(self, *args):
         # print(self,self.to_widget(*self.pos),self.to_local(*self.pos),self.to_window(*self.pos),self.to_parent(*self.pos))
@@ -35,7 +42,9 @@ class HoverHighlightBehavior(object):
             return
         
         pos = args[1]
-        inside = self.collide_point(*self.to_widget(*pos))
+        # inside = self.collide_point(*self.to_widget(*pos))
+        inside = self.collide_point(*self.to_widget(*self.kvWindow.mouse_pos))
+
         if self.hovered == inside:
             return
         self.border_point = pos
@@ -64,6 +73,7 @@ class HoverHighlightBehavior(object):
             inside = self.collide_point(*self.parent.to_widget(*pos))
         except:
             inside = self.collide_point(*self.to_widget(*pos))
+        # inside = self.collide_point(*self.to_widget(*self.kvWindow.mouse_pos))
         if self.hovered == inside:
             return
         self.border_point = pos
@@ -88,11 +98,19 @@ class HoverHighlightBehavior(object):
         _app._tooltip(self.tooltip_text,**self.tooltip_args)
 
     def on_enter(self):
-        self.bcolor=self.bcolor_down[:3]+[self.bcolor_down[-1]/2]
-            
+        # self.bcolor=self.bcolor_down[:3]+[self.bcolor_down[-1]/2]
+        if self.do_highlight:
+            self.bcolor=self._higlight_color
+    
+    
 
     def on_leave(self):
-        self.bcolor=self.bcolor_normal
+        # self.bcolor=self.bcolor_normal
+        if self.do_highlight:
+            if getattr(self,'selected',False):
+                self.bcolor=getattr(self,'selected_color',self.bcolor_normal)
+            else:
+                self.bcolor=self.bcolor_normal
 
 class HoverBehavior(object):
     hovered = BooleanProperty(False)
@@ -112,6 +130,7 @@ class HoverBehavior(object):
             return
         
         pos = args[1]
+        # inside = self.collide_point(*self.to_widget(*self.kvWindow.mouse_pos))
         try:
             inside = self.collide_point(*self.parent.to_widget(*pos))
         except:
@@ -140,7 +159,8 @@ class HoverBehavior(object):
             return
         
         pos = args[1]
-        inside = self.collide_point(*self.to_widget(*pos))
+        # inside = self.collide_point(*self.to_widget(*pos))
+        inside = self.collide_point(*self.to_widget(*self.kvWindow.mouse_pos))
         # if inside:
         #     self.dispatch('on_over')
         # print('pos')

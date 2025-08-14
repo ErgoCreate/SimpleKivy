@@ -1,5 +1,16 @@
 import io
 from kivy.lang import Builder
+
+# __created__={}
+
+# def __getattr__(name):
+#     if name in __created__:
+#         return __created__[name]
+
+#     if name=='Image':
+#         pass
+
+
 '''
 Text Input
 ==========
@@ -203,7 +214,7 @@ from kivy.properties import StringProperty, NumericProperty, \
     ListProperty, ObjectProperty, VariableListProperty, ColorProperty, \
     BoundedNumericProperty
 
-__all__ = ('TextInput', )
+# __all__ = ('TextInput', )
 
 
 if 'KIVY_DOC' in environ:
@@ -4107,7 +4118,7 @@ To create a CodeInput with highlighting for `Cython`::
 
 '''
 
-__all__ = ('CodeInput', )
+# __all__ = ('CodeInput', )
 
 from pygments import highlight
 from pygments import lexers
@@ -4576,7 +4587,7 @@ And in your kivy language file::
                 pos: self.x - 10, self.y - 10
 
 '''
-__all__ = ('Image', 'AsyncImage')
+# __all__ = ('Image', 'AsyncImage')
 
 from kivy.uix.widget import Widget
 from kivy.core.image import Image as CoreImage
