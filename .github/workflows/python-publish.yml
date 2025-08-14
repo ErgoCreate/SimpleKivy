@@ -1,40 +1,29 @@
-name: Upload Python Package
+name: Publish to PyPI
 
 on:
   release:
     types: [published]
 
 jobs:
-  release-build:
+  deploy:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0  # Important to get tags/release info
 
-      - uses: actions/setup-python@v5
+      - name: Set up Python
+        uses: actions/setup-python@v5
         with:
           python-version: "3.12"
 
       - name: Install dependencies
+        run: pip install twine
+
+      - name: Publish to PyPI
+        env:
+          TWINE_USERNAME: __token__
+          TWINE_PASSWORD: ${{ secrets.PYPI_API_TOKEN }}
         run: |
-          python -m pip install --upgrade pip build wheel kivy>=2.3
-
-      - name: Upload artifacts
-        uses: actions/upload-artifact@v4
-        with:
-          name: pypi-release
-          path: dist/
-
-  pypi-publish:
-    needs: release-build
-    runs-on: ubuntu-latest
-    permissions:
-      id-token: write  # Required for PyPI trusted publishing
-    environment:
-      name: pypi
-      url: https://pypi.org/project/ErgoCreate-SimpleKivy/
-    steps:
-      - uses: actions/download-artifact@v4
-        with:
-          name: pypi-release
-          path: dist/
-      - uses: pypa/gh-action-pypi-publish@release/v1
+          twine upload dist/*
