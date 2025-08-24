@@ -8,6 +8,9 @@ from . import utils
 from .utils import resolve_color
 from kivy.uix.behaviors import ButtonBehavior
 #--------------------------------------------------------------------------------------------------------------------------------
+# hi=0
+_other_highlighted=None
+_other_highlighted_pos=(-1,-1)
 class HoverHighlightBehavior(object):
     hovered = BooleanProperty(False)
     border_point= ObjectProperty(None)
@@ -18,6 +21,7 @@ class HoverHighlightBehavior(object):
     tooltip_args=ObjectProperty({})
     _higlight_color=[1,1,1,1]
     do_highlight=BooleanProperty(True)
+
 
     def __init__(self, **kwargs):
         self.kvWindow=utils.Window
@@ -65,6 +69,8 @@ class HoverHighlightBehavior(object):
             else:
                 self.dispatch('on_leave')
     def on_mouse_pos_parent(self, *args):
+        global _other_highlighted,_other_highlighted_pos
+
         if not self.get_root_window():
             return
         
@@ -74,8 +80,11 @@ class HoverHighlightBehavior(object):
         except:
             inside = self.collide_point(*self.to_widget(*pos))
         # inside = self.collide_point(*self.to_widget(*self.kvWindow.mouse_pos))
+
         if self.hovered == inside:
             return
+        # print('here',inside,hi)
+        # hi+=1
         self.border_point = pos
         self.hovered = inside
         
@@ -83,14 +92,28 @@ class HoverHighlightBehavior(object):
             
             if inside:
                 Clock.schedule_once(self._on_tooltip,.5)
+                # self.dispatch('on_enter')
+
+                if _other_highlighted:
+                    _other_highlighted.on_mouse_pos_parent(*(None,(-1,-1)))
                 self.dispatch('on_enter')
+                _other_highlighted=self
+                _other_highlighted_pos=self.to_window(*self.pos)
+
             else:
                 self.dispatch('on_leave')
                 Clock.unschedule(self._on_tooltip)
         else:
 
             if inside:
+                # self.dispatch('on_enter')
+
+                if _other_highlighted:
+                    _other_highlighted.on_mouse_pos_parent(*(None,(-1,-1)))
                 self.dispatch('on_enter')
+                _other_highlighted=self
+                _other_highlighted_pos=self.to_window(*self.pos)
+
             else:
                 self.dispatch('on_leave')
     def _on_tooltip(self,dt):
@@ -99,24 +122,36 @@ class HoverHighlightBehavior(object):
 
     def on_enter(self):
         # self.bcolor=self.bcolor_down[:3]+[self.bcolor_down[-1]/2]
+        # print('entering:',self)
         if self.do_highlight:
             self.bcolor=self._higlight_color
-    
+        
     
 
     def on_leave(self):
+        global _other_highlighted,_other_highlighted_pos
+        # print('leaving:',self)
         # self.bcolor=self.bcolor_normal
+        wpos=self.to_window(*self.pos)
+        if _other_highlighted_pos==wpos:
+        # if _other_highlighted==self:
+            _other_highlighted=None
+            _other_highlighted_pos=(-1,-1)
+            # Clock.schedule_once(lambda dt:setattr(HoverHighlightBehavior,'_other_highlighted',None))
+
         if self.do_highlight:
             if getattr(self,'selected',False):
                 self.bcolor=getattr(self,'selected_color',self.bcolor_normal)
             else:
                 self.bcolor=self.bcolor_normal
 
+
 class HoverBehavior(object):
     hovered = BooleanProperty(False)
     border_point= ObjectProperty(None)
     tooltip_text=StringProperty('')
     tooltip_args=ObjectProperty({})
+    _other_highlighted=None
     def __init__(self, **kwargs):
         self.kvWindow=utils.Window
         self.register_event_type('on_enter')
@@ -126,6 +161,7 @@ class HoverBehavior(object):
         # super(HoverHighlightBehavior, self).__init__(**kwargs)
         super(HoverBehavior, self).__init__(**kwargs)
     def on_mouse_pos_parent(self, *args):
+        global _other_highlighted
         if not self.get_root_window():
             return
         
@@ -144,14 +180,28 @@ class HoverBehavior(object):
             
             if inside:
                 Clock.schedule_once(self._on_tooltip,.5)
+                # self.dispatch('on_enter')
+
+                # if _other_highlighted:
+                #     _other_highlighted.on_mouse_pos_parent(*(None,(-1,-1)))
                 self.dispatch('on_enter')
+                # _other_highlighted=self
+                # _other_highlighted_pos=self.to_window(*self.pos)
+
             else:
-                self.dispatch('on_leave')
                 Clock.unschedule(self._on_tooltip)
+                self.dispatch('on_leave')
         else:
 
             if inside:
+                # self.dispatch('on_enter')
+
+                # if _other_highlighted:
+                #     _other_highlighted.on_mouse_pos_parent(*(None,(-1,-1)))
                 self.dispatch('on_enter')
+                # _other_highlighted=self
+                # _other_highlighted_pos=self.to_window(*self.pos)
+
             else:
                 self.dispatch('on_leave')
     def on_mouse_pos(self, *args):
@@ -195,6 +245,12 @@ class HoverBehavior(object):
 
     def on_leave(self):
         pass
+        # global _other_highlighted,_other_highlighted_pos
+        # wpos=self.to_window(*self.pos)
+        # # if _other_highlighted==self:
+        # if _other_highlighted_pos==wpos:
+        #     _other_highlighted=None
+        #     _other_highlighted_pos=(-1,-1)
 
 
 from kivy.uix.behaviors import ToggleButtonBehavior

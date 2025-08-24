@@ -4398,9 +4398,13 @@ def __getattr__(name):
                             try:
                                 ci=self.ccolors[m]
                             except:
-                                ci=utils.colors[cc%20]
+                                # print(cc,cc%20)
+                                ci=utils.colors.tab20[cc%20]
                                 self.ccolors[m]=ci
-                                mwid.lcolor=ci[:]+tuple([1])
+                                mwid.lcolor=ci#[:]+tuple([1])
+                                mwid.bcolor=(.2,.2,.2,1)
+                                mwid.lwidth=2
+
 
                             # tl=re.sub(r"\d", "", m)
                             # abc0=abc.index(tl.upper())
@@ -4425,7 +4429,7 @@ def __getattr__(name):
                         ci=self.ccolors[li]
                     except:
                         cc+=1
-                        ci=utils.colors[cc%20]
+                        ci=utils.colors.tab20[cc%20]
                         self.ccolors[li]=ci
                         
                     
@@ -4435,13 +4439,16 @@ def __getattr__(name):
                             m=abc[abci]+str(i)
                             if m in self.parent.sheet.children_dict:
                                 mwid=self.parent.sheet.children_dict[m]
-                                mwid.lcolor=ci[:]+tuple([1])
+                                mwid.lcolor=ci#[:]+tuple([1])
+                                mwid.bcolor=(.2,.2,.2,1)
+                                mwid.lwidth=2
             def decolor_text(self):
                 for wid in self.parent.sheet.children_dict.values():
                     wid.lcolor=(1,1,1,1)
+                    wid.lwidth=1
+                    wid.bcolor=(0,0,0,0)
             def on_text(self,instance,text):
                 self.decolor_text()
-
                 self.color_text(instance,text)
         return ICell
     elif name=='SpinnerOptionB':

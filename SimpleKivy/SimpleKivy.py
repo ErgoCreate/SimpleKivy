@@ -66,9 +66,20 @@ def __div__Widget(self,val):
         return BoxitV( self, val,size='xchildren',k=NOTKEY,pos_hint=pos_hint,
             # lcolor='g'
             )
+ids={}
+get=ids.get
+def id_set(self,val):
+    global ids
+    self._id=val
+    if not val in (None,NOTKEY):
+        ids[val]=self
+def id_get(self):
+    return self._id
+
 # setattr(Widget,'__mul__' , types.MethodType(__mul__Widget, Widget))
 setattr(Widget,'__mul__' , __mul__Widget)
 setattr(Widget,'__truediv__' , __div__Widget)
+setattr(Widget,'id',property(id_get,id_set))
 
 # setattr(Widget,'__add__',__mul__Widget)
 from kivy.logger import Logger
@@ -118,6 +129,8 @@ size=infinite()
 def __getattr__(name):
     if name=='app':
         return app_get()
+    else:
+        raise ImportError(f"cannot import name '{name}' from '{__name__}' ({__file__})")
 
 def app_lambda(*largs,**kwargs):
     return lambda *x:app_get()(*largs,**kwargs)
@@ -1504,7 +1517,33 @@ class MyApp(App):
                 else:
                     spinner_vals_d[sv].append(ext)
         
-        spinner_filetypes=Spinner(spinner_vals[0],spinner_vals)
+        # spinner_filetypes=Spinner2Dark(spinner_vals[0],spinner_vals)
+        
+        # spinner_filetypes=Spinner(spinner_vals[0],spinner_vals)
+        spin_btn=ClearB(text=spinner_vals[0],lcolor='gray',k=NOTKEY)
+        spin_lbl=Label(mdi('chevron-down'),size='x30',markup=True,k=NOTKEY)
+        spin_btn.add_widget(
+            spin_lbl
+            )
+        def on_dd_open(ins,to):
+            # print(x)
+            if to==None:
+                spin_lbl.text=mdi('chevron-down')
+            else:
+                spin_lbl.text=mdi('chevron-up')
+
+
+        spinner_filetypes=AddDropDown(
+            spin_btn,
+            [FlatB(text=svi,size='y35',lcolor='gray',bcolor='',k=NOTKEY,on_release=lambda ins:setattr(spin_btn,'text',ins.text)) for svi in spinner_vals],
+            bcolor='#2C2C2C',
+            # lcolor='gray',
+            # on_attach_to=on_dd_open
+            bind={
+            'attach_to':on_dd_open
+            }
+            )
+
         spinner_filetypes.vals_d=spinner_vals_d
         def on_filetype(ins,t):
             # print(ins.vals_d[t])
@@ -1579,6 +1618,7 @@ class MyApp(App):
                 elif os.path.isdir(filename):
                     ins.root.filelist.on_path( pathlib.Path(filename) )
                     self.__call__(ins.root.input_selection,text='')
+
                     return True
                     # self.popup_message(f'{mdi('alert',color='yellow',size=30)} The filename is a directory:\n"{filename}"',auto_dismiss=1.5,title='Error',markup=True)
                 else:
@@ -1588,7 +1628,18 @@ class MyApp(App):
 
         btn_open.bind(on_release=on_btn_open)
         kvfilelist.bind(on_file_double_click=lambda ins,rv,i:btn_open.trigger_action())
-        pop.bind(on_dismiss=lambda *x:self.remove_top_widget())
+        
+        def on_pop_dismiss(ins):
+            get_kvApp().remove_top_widget()
+        pop.bind(on_dismiss=on_pop_dismiss)
+        # pop.bind(on_dismiss=lambda *x:self.remove_top_widget())
+
+        def on_pop_open(ins):
+            if ins.root.filelist.input_search.text:
+                ins.root.filelist.input_search.text=''
+                ins.root.filelist.btn_apply_sort.dispatch('on_release')
+        pop.bind(on_pre_open=on_pop_open)
+        
         input_selection.bind(on_text_validate=lambda *x:btn_open.trigger_action())
         self._filebrowser[_k]=pop
         pop.open()
@@ -1684,6 +1735,8 @@ class MyApp(App):
                 ins.root.input_selection.cursor=(0,0)
 
         kvfilelist.bind(on_selection=on_file_select)
+        if callback==None:
+            callback=utils.do_nothing
         kel.callback=callback
 
         kel.btn_open=btn_open
@@ -1717,7 +1770,18 @@ class MyApp(App):
         btn_open.bind(on_release=on_btn_open)
         # kvfilelist.filelist.bind(on_double_click=lambda *x:setattr(input_selection,'text',''))
         kvfilelist.bind(on_directory=lambda *x:self.__call__(input_selection,text=''))
-        pop.bind(on_dismiss=lambda *x:self.remove_top_widget())
+
+        def on_pop_dismiss(ins):
+            get_kvApp().remove_top_widget()
+        pop.bind(on_dismiss=on_pop_dismiss)
+        # pop.bind(on_dismiss=lambda *x:self.remove_top_widget())
+        
+        def on_pop_open(ins):
+            if ins.root.filelist.input_search.text:
+                ins.root.filelist.input_search.text=''
+                ins.root.filelist.btn_apply_sort.dispatch('on_release')
+        pop.bind(on_pre_open=on_pop_open)
+
         def on_input_validate(ins):
             ins.root.btn_open.trigger_action()
         input_selection.bind(on_text_validate=on_input_validate)
@@ -1954,11 +2018,26 @@ class MyApp(App):
             self.maximize()
 
     def close(self):
+        # print('hell')
         # self.get_running_app().stop()
-        # self.event_manager(self,'__Close__')
         self._leaving=True
-        self.stop()
-        self.kvWindow.close()
+        # self.event_manager(self,'__Close__')
+        Clock.schedule_once(lambda dt:self.event_manager(self,'__Close__'))
+        
+        # self.trigger_event('__Close__')
+        
+        # self.event_manager(self,'__Close__')
+        # Clock.schedule_once(lambda dt : self.event_manager(self,'__Close__'))
+        # self.kvWindow.close()
+        # Clock.schedule_once(lambda dt: self.kvWindow.close(),1)
+        # self=App.get_running_app()
+        
+        # self.trigger_event('__Close__')
+        Clock.schedule_once(lambda dt:self.stop())
+        # Clock.schedule_once(lambda dt:self.close())
+
+        # self.stop()
+
     def is_leaving(self):
         return self._leaving
     def on_stop(self):
@@ -2286,6 +2365,41 @@ def Switch(active=False,k=None,enable_events=True,on_event='active',**kwargs):
 #             print('hell on earth')
 #         kel.bind(parent=on_parent)
 #     return kel
+# @skwidget
+def AddDropDown(main_widget,widget_list,on_select=utils.do_nothing,k=None,element_auto_height=True,auto_width=True,width=100,element_height=48,**kwargs):
+    # dropdown=kvw.DropDownB(auto_width=auto_width,width=width)
+    # dropdown=skivify(kvw.DropDownB,auto_width=auto_width,width=width,k=k,**kwargs)
+    DD=extwidget_to_skwidget(kvw.DropDownB)
+    
+    dropdown=DD(auto_width=auto_width,width=width,k=k,**kwargs)
+
+    main_widget.bind(on_release=dropdown.open)
+
+    setattr(main_widget,'dropdown_widgets',widget_list)
+    # setattr(dropdown,'main_widget',widget_list)
+
+    # def btn_select(btn):
+        # setattr(dropdown.attach_to,'selected',btn.index)
+        # dropdown.select(btn)
+        # setattr(dd.attach_to,"selected",btn.index)
+        # print(x)
+        # dd.select(dd,btn)
+    for i,w in enumerate(widget_list):
+        setattr(w,'index',i)
+        shy=w.size_hint_y
+        # print(w,f"{shy = }")
+        if shy!=None:
+            if element_auto_height:# and w.size_hint_y!=None:
+                w.size_hint_y=None
+                w.height=element_height
+        if hasattr(w,'on_release'):
+            # w.bind(on_release=btn_select)
+            w.bind(on_release=lambda *x:dropdown.select(*x))
+        dropdown.add_widget(w)
+
+    dropdown.bind(on_select=on_select)
+    # Clock.schedule_once(lambda dt:get_kvApp().paw())
+    return main_widget
 
 
 
@@ -3050,7 +3164,7 @@ def Boxit(*widgets,k=None,base_cls=None,**kwargs):
 @skwidget
 def Splitter(widget=None,k=None,sizable_from = 'right',**kwargs):
     from kivy.uix.splitter import Splitter as kvWd
-    kel=skivify_v2(kvWd,k=k,sizable_from=sizable_from,**kwargs)
+    kel=skivify(kvWd,k=k,sizable_from=sizable_from,**kwargs)
     if widget:
         kel.add_widget(widget)
     return kel
@@ -3390,7 +3504,7 @@ def TitlebarCloseButton(markup=True,k=NOTKEY,size="x44",hover_highlight=True,lco
 
     def onc(*l):
         self=App.get_running_app()
-        self.trigger_event('__Close__')
+        # self.trigger_event('__Close__')
         Clock.schedule_once(lambda dt:self.close())
 
     kel.bind( on_release=onc)
@@ -3663,12 +3777,12 @@ def Boxit_scatter(*widgets,k=None,**kwargs):
 Scatterit=Boxit_scatter
 
 @skwidget
-def Boxit_angle_bbox(*widgets,k=None,enable_events=True,on_event="on_release",**kwargs):
+def ButtonBoxitAngle(*widgets,k=None,angle=0,enable_events=True,on_event="on_release",**kwargs):
     # kwargs=_preproces(**kwargs)
 
     kvWd=kvw.AngleBBoxLayout
 
-    kel=skivify_v2(kvWd,k=k,enable_events=True,on_event=on_event,**kwargs)
+    kel=skivify_v2(kvWd,k=k,angle=angle,enable_events=True,on_event=on_event,**kwargs)
 
     for w in widgets:
         kel.add_widget(w)
@@ -3679,7 +3793,24 @@ def Boxit_angle_bbox(*widgets,k=None,enable_events=True,on_event="on_release",**
     # kel.size_hint=kwargs.get('size',(1,1))
 
     return kel
-ButtonBoxitAngle=Boxit_angle_bbox
+# ButtonBoxitAngle=Boxit_angle_bbox
+
+@skwidget
+def BoxitAngle(*widgets,k=None,angle=0,enable_events=True,on_event="on_release",**kwargs):
+    # kwargs=_preproces(**kwargs)
+
+    kvWd=kvw.AngleBoxLayout
+
+    kel=skivify_v2(kvWd,k=k,angle=angle,enable_events=True,on_event=on_event,**kwargs)
+
+    for w in widgets:
+        kel.add_widget(w)
+
+    # _future_elements.append(kel)
+
+    # kel.size=kwargs.get('size',(100,100))
+    # kel.size_hint=kwargs.get('size',(1,1))
+    return kel
 
 @skwidget
 def StripLayout(*widgets,k=None,rows=1,**kwargs):
@@ -4610,12 +4741,12 @@ def Spinner(# default value shown
 
     
 
-    kel=utils.Spinner(text=text,values=values,**kwargs)
+    kel=skivify(utils.Spinner,text=text,k=k,enable_events=enable_events,on_event=on_event,values=values,**kwargs)
     
-    kel.id=k
+    # kel.id=k
 
-    kel.enable_events=enable_events
-    kel.on_event=on_event
+    # kel.enable_events=enable_events
+    # kel.on_event=on_event
 
     # if enable_events:
     #     _future_bind.append(kel)
@@ -4625,7 +4756,7 @@ def Spinner(# default value shown
 def Spinner2(text='choice0',
     values=('choice0', 'choice1'),
     enable_events=False,k=None,on_event='text',
-    background_normal='atlas://skdata/sktheme/spinner',
+    background_normal='atlas://skdata/sktheme/spinner_full',
     option_cls=None,
     **kwargs
     ):
@@ -4645,6 +4776,58 @@ def Spinner2(text='choice0',
         enable_events=enable_events,k=k,on_event=on_event, **kwargs
     )
     return kel
+
+# def Spinner2Dark(text='choice0',
+#     values=('choice0', 'choice1'),
+#     enable_events=False,k=None,on_event='text',
+#     background_normal='atlas://skdata/sktheme/spinner_dark',
+#     color='white',
+#     background_color='#191919',
+#     # background_color='w',
+#     option_cls=None,
+#     **kwargs
+#     ):
+#     # color=utils.resolve_color(color)
+#     # background_color=utils.resolve_color(background_color)
+
+#     from .modkvWidgets import SpinnerOptionB
+#     class SpinnerOptionBDark(SpinnerOptionB):
+#         background_normal='atlas://skdata/sktheme/spinneroption_dark'
+#     SpinnerOptionBDark.background_normal='atlas://skdata/sktheme/spinneroption_dark'
+
+#         # background_color=[1,1,1,1]
+#         # markup=False
+#         # halign='center'
+#         # valign='middle'
+#         # color=[1,1,1,1]
+#         # background_normal='atlas://skdata/sktheme/spinneroption_dark'
+#         # def on_release(self):
+#         #     self.background_color='atlas://skdata/sktheme/spinneroption_dark'
+
+#         # markup=kwargs.get('markup',False)
+#         # halign=kwargs.get('halign','center')
+#         # valign=kwargs.get('valign','middle')
+#         # color=kvw.ColorProperty([1,1,1,1])
+#         # background_color=kvw.ColorProperty([1,1,1,1])
+#     # # SpinnerOptionB=SpinnerOptionBDark
+#     # SpinnerOptionB.markup=kwargs.get('markup',False)
+#     # SpinnerOptionB.halign=kwargs.get('halign','center')
+#     # SpinnerOptionB.valign=kwargs.get('valign','middle')
+#     # SpinnerOptionB.color=kwargs.get('color',color)
+#     # # SpinnerOptionB.background_normal=kwargs.get('background_normal','atlas://skdata/sktheme/spinneroption_dark')
+#     # SpinnerOptionB.background_color=kwargs.get('background_color',background_color)
+#     # # SpinnerOptionB.halign=kwargs.get('halign','center')
+#     # SpinnerOptionB.bind()
+
+#     kel=Spinner(
+#         text=text,values=values,
+#         background_normal=background_normal,
+#         background_color=background_color,
+#         color=color,
+#         option_cls=SpinnerOptionBDark,
+#         enable_events=enable_events,k=k,on_event=on_event, **kwargs
+#     )
+#     return kel
 
 @skwidget
 def ListBox(
@@ -5296,7 +5479,8 @@ def CalcSheet(
                             )
                     stbtn=kvw.SplitterV2(
                         size_hint=(None,None),size=(4,30),
-                        bcolor_normal=(0.5,0.5,0.5,0.5))
+                        bcolor_normal=(0.5,0.5,0.5,0.5)
+                        )
 
                     box.add_widget(hlabel)
                     box.add_widget(stbtn)
@@ -5878,6 +6062,36 @@ def Filelist(
         # return ' / '.join(ans)
         return mdi('chevron-right',color='w',size=20).join(ans)
     def load_from_path(self,cdir):
+        # Clock.schedule_once(lambda dt:setattr(self.filelist,'data',[
+        #     dict(
+        #             meta=utils.infinite(),
+        #             stat=None,
+        #             height=35,size_hint_y=None,
+        #             selectable=False,
+        #             data=[
+        #                 dict(text=self.icons.get('sync'),width=30,size_hint_x=None,shorten=False), 
+        #                 dict(text="Loading..."),
+        #                 dict(text="",size_hint_max_x=130,bcolor='',halign='right'),
+        #                 dict(size_hint_max_x=100,bcolor='',halign='right'),
+        #                 ]
+        #         )
+        #     ]))
+        # self.filelist.data=[
+        #     dict(
+        #             meta=utils.infinite(),
+        #             stat=None,
+        #             height=35,size_hint_y=None,
+        #             selectable=False,
+        #             data=[
+        #                 dict(text=self.icons.get('sync'),width=30,size_hint_x=None,shorten=False), 
+        #                 dict(text="Loading..."),
+        #                 dict(text="",size_hint_max_x=130,bcolor='',halign='right'),
+        #                 dict(size_hint_max_x=100,bcolor='',halign='right'),
+        #                 ]
+        #         )
+        #     ]
+        # Clock.schedule_once(lambda dt:setattr(self.filelist,'scroll_y',1))
+
         cdir=cdir.resolve().absolute()
         self.dispatch('on_directory',cdir)
         data=[]
@@ -5901,6 +6115,7 @@ def Filelist(
                     dict(
                         meta=fi,
                         # lcolor='r',
+                        selectable=True,
                         stat=fi_stat,
                         height=35,size_hint_y=None,
                         data=[
@@ -5929,6 +6144,7 @@ def Filelist(
                     dict(
                         meta=fi,
                         stat=fi_stat,
+                        selectable=True,
                         # size=(1,90),size_hint_y=None,
                         height=35,size_hint_y=None,
                         # lcolor='',
@@ -6164,8 +6380,8 @@ def Filelist(
             padding=4,
             )
     input_search.bind(on_text_validate=lambda x:btn_apply_sort.trigger_action())
-    sort_menu.sort_mode=0
-    sort_menu.folder_mode=0
+    sort_menu.sort_mode=4
+    sort_menu.folder_mode=1
     # sort_menu.default=[1,0,0,0,0,0]
 
     AddMenu(
@@ -6248,13 +6464,16 @@ def Filelist(
         text=f"{mdi('refresh',size=20)} [u]Storage units[/u]",
         # tooltip_text="Reload storage devices list",
         # font_size=20,
+        do_highlight=False,
         markup=True,
         halign='left',
         valign='middle',
-                height=50,size_hint_y=None,
-                lcolor='',
+                height=30,size_hint_y=None,
+                width=120,size_hint_x=None,
+                lcolor='gray',
                 on_release=lambda rv,i:rv.refresh(),
-        color='#4CCE70'
+        color='#4CCE70',
+        # lcolor="xkcd:dark grey",
                 # on_touch_up=print,
                 # lcolor='dark grey',
         # font_size=25
@@ -6268,7 +6487,7 @@ def Filelist(
                     # size_hint_x=.2,
                     width=135,
                     size_hint_x=None,
-                    spacing=4,
+                    spacing=2,
                     # size_hint_min_x=300,
                     )
     shortcuts.base_shortcuts=shortcut_list+refresh_storage
@@ -6388,6 +6607,7 @@ def Filelist(
     input_search.root=kel
     kel.input_search=input_search
     btn_apply_sort.root=kel
+    kel.btn_apply_sort=btn_apply_sort
     kel.sort_menu=sort_menu
     sort_menu.root=kel
 

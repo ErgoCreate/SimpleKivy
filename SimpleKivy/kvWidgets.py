@@ -78,6 +78,7 @@ class ColorProperty(Property):
     def __init__(self, defaultvalue=None, **kwargs):
         if defaultvalue == None:
             defaultvalue = [1, 1, 1, 1]  # default white
+        # defaultvalue=resolve_color(defaultvalue)
         super().__init__(defaultvalue, **kwargs)
     
     def get(self, obj):
@@ -131,7 +132,7 @@ from kivy.clock import Clock
 
 from kivy.uix.widget import Widget
 from kivy.uix.checkbox import CheckBox
-# from kivy.metrics import dp
+from kivy.metrics import dp
 
 
 
@@ -1594,7 +1595,7 @@ class SplitterV2(ButtonBehavior,BoxLayout):
 
             return True
         self._moving=False
-        return super(SplitterV2, self).on_touch_down(touch)
+        # return super(SplitterV2, self).on_touch_down(touch)
     def on_touch_up(self, touch):
         self._moving=False
         return touch
@@ -1645,7 +1646,7 @@ class SplitterV2(ButtonBehavior,BoxLayout):
                 return True
             except:
                 traceback.print_exc()
-        return super(SplitterV2, self).on_touch_move(touch)
+        # return super(SplitterV2, self).on_touch_move(touch)
 
 
 Builder.load_string('''
@@ -2197,14 +2198,17 @@ class Rowlist(RV):
 class CalcGridLayout(kvw.GridLayout):
     dpos=StringProperty('A1')
     cval=ObjectProperty(0)
-    _data_num=CaseInsensitiveDict()
-    _exec_code='import math\nimport statistics\n'
-    exec_vars={}
-    error=''
     selected=None
-    headers=CaseInsensitiveDict()
-    columns=CaseInsensitiveDict()
-    children_dict=CaseInsensitiveDict()
+    def __init__(self,**kw):
+        self._data_num=CaseInsensitiveDict()
+        self._exec_code='import math\nimport statistics\n'
+        self.exec_vars={}
+        self.error=''
+        # self.
+        self.headers=CaseInsensitiveDict()
+        self.columns=CaseInsensitiveDict()
+        self.children_dict=CaseInsensitiveDict()
+        super(CalcGridLayout,self).__init__(**kw)
     def compile_ecode(self):
         self.exec_vars={}
         exec(self._exec_code,self.exec_vars)
@@ -2558,11 +2562,17 @@ class ScatterB(Scatter):
 
 
 # sk._Factory.register('KivyB', module='Separator')
+
 Builder.load_string("""
 <AngleBBoxLayout>:
     bcolor_normal: 0, 0, 0, 0
     bcolor_down: .2, .64, .8, 1
-    bcolor: self.bcolor_normal
+    # bcolor: self.bcolor_normal
+
+    bcolor: self.bcolor
+    lcolor: self.lcolor
+    lwidth: self.lwidth
+    angle: self.angle
 
     canvas.before:
         Color:
@@ -2570,13 +2580,17 @@ Builder.load_string("""
         Rectangle:
             pos: self.pos
             size: self.size
-    #canvas.before:
         PushMatrix
         Rotate:
             angle: root.angle
             origin: root.center
     canvas.after:
         PopMatrix
+        Color:
+            rgba: self.lcolor
+        Line:
+            width: self.lwidth
+            rectangle: (self.x, self.y, self.width, self.height)
 """)
 
 
@@ -2584,42 +2598,73 @@ class AngleBBoxLayout(ButtonBehavior,BoxLayout):
     bcolor_normal = ListProperty([0, 0, 0, 0])
     bcolor_down = ListProperty([.2, .64, .8, 1])
     bcolor = ListProperty([0, 0, 0, 0])
+    
+    lcolor = ColorProperty([0, 0, 0, 0])
+    lwidth = NumericProperty(1)
+
     angle = NumericProperty(0)  # Angle property in degrees
 
     def __init__(self, **kwargs):
+        # angle=kwargs.get('angle',self.angle)
         super(AngleBBoxLayout, self).__init__(**kwargs)
-        # self.bind(angle=self.update)
-        # self.size=kwargs.get('size',(100,100))
-        # self.size_hint=kwargs.get('size',(1,1))
-
+        # Clock.schedule_once(lambda dt:self.setter('angle')(self,angle))
     def on_state(self,instance, value):
-        # print('pressed')
-        # print(f"{self.bcolor =}")
-        # print(f"{self.size =}")
-        # print(f"{self.size_hint =}")
         if value == 'down':
             self.bcolor=self.bcolor_down
         else:
             self.bcolor=self.bcolor_normal
 
-    # def update(self, *args):
-    #     # pass
-    #     self.canvas.before.clear()
-    #     with self.canvas.before:
-    #         Color(self.bcolor)
-    #         Rectangle(pos=self.pos, 
-    #             size=self.size, 
-    #             size_hint=self.size_hint
-    #             )
-    # def on_width(self, instance, value):
-    #     if self.height != value:
-    #         self.height = value
+Builder.load_string("""
+<AngleBoxLayout>:
+    bcolor: self.bcolor
+    lcolor: self.lcolor
+    lwidth: self.lwidth
+    angle: self.angle
 
-    # def on_height(self, instance, value):
-    #     if self.width != value:
-    #         self.width = value
+    canvas.before:
+        Color:
+            rgba: self.bcolor
+        Rectangle:
+            pos: self.pos
+            size: self.size
+
+        PushMatrix
+        Rotate:
+            angle: root.angle
+            origin: root.center
+    canvas.after:
+        PopMatrix
+        Color:
+            rgba: self.lcolor
+        Line:
+            width: self.lwidth
+            rectangle: (self.x, self.y, self.width, self.height)
+""")
 
 
+class AngleBoxLayout(BoxLayout):
+    bcolor = ColorProperty([0, 0, 0, 0])
+    lcolor = ColorProperty([0, 0, 0, 0])
+    lwidth = NumericProperty(1)
+    angle = NumericProperty(0)  # Angle property in degrees
+
+    def __init__(self, **kwargs):
+        # angle=kwargs.get('angle',self.angle)
+        # print(f"{angle=}")
+        super(AngleBoxLayout, self).__init__(**kwargs)
+        # Clock.schedule_once(lambda dt:self.setter('angle')(self,angle))
+
+    # def on_angle(self,ins,v):
+    #     av=abs(v)
+    #     pm=v>=360
+    #     do=[360,-360]
+    #     nt=int(av//360)
+    #     if nt:
+    #         for i in range(nt):
+    #             v+=do[pm]
+    #         # Clock.schedule_once(lambda dt:setattr(ins,'angle',v))
+    #         ins.angle=v
+    #         return True
 
 
 

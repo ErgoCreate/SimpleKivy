@@ -2,6 +2,9 @@
 import platform
 import os
 import sys
+import traceback
+import random
+import time
 
 platform='unknown'
 if sys.platform.lower().startswith('win'):
@@ -33,6 +36,17 @@ if platform=='win':
     DWMWA_TEXT_COLOR = 36
     DWMWA_BORDER_COLOR = 34
     DWMWA_VISIBLE_FRAME_BORDER_THICKNESS = 37
+
+    def hide_window_by_title(window_title):
+        hwnd = win32gui.FindWindow(None, window_title)
+        if hwnd:
+            win32gui.ShowWindow(hwnd, win32con.SW_HIDE)
+            return True
+        return False
+    def console_hide():
+        utitle="".join([str(random.randint(0,9)) for i in range(7)])
+        os.system(f'TITLE '+utitle)
+        hide_window_by_title(utitle)
 
     def find_hwnd_by_title(title):
         hwnd = win32gui.FindWindow(None, title)
@@ -224,10 +238,19 @@ if platform=='win':
     )
 
     class SplashScreen:
-        def __init__(self, image_path=None, text="", font_size=12):
+        def __init__(self, image_path=None, text="Loading...", font_size=12,keep_on_top=False):
+            self.keep_on_top=keep_on_top
             if image_path==None:
-                from kivy.resources import resource_find
-                image_path=resource_find('data/logo/kivy-icon-512.png')
+                # from kivy.resources import resource_find,resource_add_path
+                # image_path=resource_find("skdata/logo/simplekivy-splash-512.png")
+                if not image_path:
+                    SK_PATH_FILE = os.path.abspath(__file__)
+                    SK_PATH = os.path.dirname(SK_PATH_FILE)
+                    # resource_add_path(SK_PATH)
+                    image_path=os.path.join(SK_PATH,"skdata/logo/simplekivy-splash-512.png")
+
+                
+                image_path=image_path
             self.image_path = image_path
             self.text = text
             self.font_size = font_size
@@ -251,17 +274,19 @@ if platform=='win':
         def close(self):
         	# self.form.Close()
         	# Application.Exit()
-        	# print('finished')
             """Request the splash screen to close from any thread."""
-            with self._lock:
-                self._close_requested = True
-            if self.form is not None and not self.form.IsDisposed:
-                # Use Invoke to safely close the form from any thread
-                self.form.Invoke(System.Action(self.form.Close))
-                # self.form.Invoke(System.Action(Application.Exit))
-            # while not self._closed:
-            # 	time.sleep(.001)
-            # self.form.Close()
+            try:
+                with self._lock:
+                    self._close_requested = True
+                if self.form is not None and not self.form.IsDisposed:
+                    # Use Invoke to safely close the form from any thread
+                    self.form.Invoke(System.Action(self.form.Close))
+                    # self.form.Invoke(System.Action(Application.Exit))
+                # while not self._closed:
+                # 	time.sleep(.001)
+                # self.form.Close()
+            except:
+                traceback.print_exc()
 
         def _run_form(self):
             """Main method to run the form in the thread."""
@@ -319,7 +344,11 @@ if platform=='win':
             with self._lock:
                 if self._close_requested and self.form is not None and not self.form.IsDisposed:
                     self.form.Close()
-
+                else:
+                    try:
+                        self.form.TopMost = self.keep_on_top
+                    except:
+                        pass
 
     def set_constant_window_colors(hwnd, 
                                  bg_color=0x00000000,
@@ -396,3 +425,9 @@ if platform=='win':
         except Exception as e:
             print(f"Error setting window attributes: {e}")
             return False
+
+
+# s=SplashScreen()
+# s.show()
+# time.sleep(4)
+# s.close()
