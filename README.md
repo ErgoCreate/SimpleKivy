@@ -34,7 +34,7 @@ Building **Kivy** apps traditionally requires managing multiple files (`.py` + `
 
 - **⚡ Code Faster** – Reduce setup time and get straight to building.  
 - **🎨 Customize Easily** – Modify styles, layouts, and behavior without deep Kivy knowledge.  
-- **✨ Make It Stunning** – Access Kivy's animations, effects, and features effortlessly.  
+- **🧩 Seamless Integration** – Access Kivy's animations, effects, and legacy features effortlessly.  
 - **🤖 Backend-First** – Keep your app logic clean while the GUI adapts.
 
 # **Getting started**
