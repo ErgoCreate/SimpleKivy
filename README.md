@@ -163,41 +163,5 @@ Either way, **SimpleKivy is free to use!**
 # Supported Elements
 This is a list of the supported widgets that you can use in your window layouts right now:
 
-|                 |                  |                  |
-|-------------------------|-------------------------|-------------------------|
-| * **ActionBar**         | * **ClearRoundButton**  | * **FlatTButtonAngle**  |
-| * **ActionButton**      | * **CodeInput**         | * **FlatToggleButton**  |
-| * **ActionCheck**       | * **ComboBox**          | * **FlatToggleButtonAngle** |
-| * **ActionInput**       | * **DatePicker** *(experimental)* | * **Floatit**           |
-| * **ActionLabelCheck**  | * **DropDown**          | * **Grid**              |
-| * **ActionPrevious**    | * **External** *(experimental)* | * **HoverBoxit**        |
-| * **ActionSeparator**   | * **Fill**              | * **Image**             |
-| * **ActionToggleButton**| * **FlatB**: Alias of FlatButton | * **Input**             |
-| * **Albumlist**         | * **FlatButton**        | * **InputDark**         |
-| * **Artistlist**        | * **FlatButtonAngle**   | * **Label**             |
-| * **B**: Alias of Button| * **FlatRoundB**: Alias of FlatRoundButton | * **LabelCheck**        |
-| * **BarTouch**          | * **FlatRoundButton**   | * **LargeText**         |
-| * **BarTouchH**: Alias of BarTouch | * **FlatTB**: Alias of FlatToggleButton | * **ListBox**           |
-| * **BarTouchV**         | * **FlatTButton**       | * **Menu** *(experimental)* |
-| * **Boxit**             | * **ModalView**         | * **Multiline**         |
-| * **BoxitH**            | * **PagedText**         | * **Pageit**            |
-| * **BoxitV**            | * **Playlist**          | * **Popup**             |
-| * **Button**            | * **ProgressBar**       | * **ProgressBar2**      |
-| * **ButtonBoxit**       | * **ProgressBarTouch**  | * **RStack**: Alias of Artistlist |
-| * **ButtonBoxitAngle**  | * **RStackit**: Alias of Artistlist | * **RecycleStackList**: Alias of Artistlist |
-| * **CalcSheet** *(experimental)* | * **Relativeit**        | * **RoundButtonRelativeit** |
-| * **Calendar**: Alias of DatePicker | * **RoundRelativeit**   | * **RstDocument**       |
-| * **Camera**            | * **Scatter**           | * **Scatterit**         |
-| * **CheckBox**          | * **Screen**            | * **ScreenManager**     |
-| * **ClearB**: Alias of ClearButton | * **Screens**: Alias of ScreenManager | * **ScrollView**        |
-| * **ClearButton**       | * **ScrollbarMirror**   | * **SeparatorH**        |
-| * **ClearRoundB**: Alias of ClearRoundButton | * **SeparatorV**        | * **Slider**            |
-| * **SliderTouch**       | * **Spinner**           | * **Spinner2**          |
-| * **Stackit**           | * **StripLayout**       | * **Switch**            |
-| * **T**: Alias of Label | * **TButton**: Alias of ToggleButton | * **Tab**               |
-| * **Tab2**              | * **Text**: Alias of Label | * **Titlebar**          |
-| * **TitlebarCloseButton** | * **TitlebarIcon**      | * **TitlebarMinimizeButton** |
-| * **TitlebarRestoreButton** | * **TitlebarTitle**     | * **ToggleButton**      |
-| * **ToggleButtonBoxit** | * **TreeView**          | * **Video**             |
-| * **VideoPlayer**       | * **Void**              | * **WebView**           |
+**ActionBar, ActionButton, ActionCheck, ActionInput, ActionLabelCheck, ActionPrevious, ActionSeparator, ActionToggleButton, Albumlist, Artistlist, Button, BarTouch, BarTouchV, Boxit, BoxitAngle, BoxitH, BoxitV, Boxit_scatter, ButtonBoxit, ButtonBoxitAngle, CalcSheet, DatePicker, Camera, CheckBox, CodeInput, ComboBox, DropDown, External, Filelist, FlatButton, FlatButtonAngle, FlatRoundButton, FlatToggleButton, FlatToggleButtonAngle, Floatit, Grid, HoverBoxit, Image, TextInput, TextInputDark, JoinLabel, Label, LabelCheck, LargeText, ListBox, Menu, ModalView, Multiline, MultilineDark, PagedText, Pageit, Playlist, Popup, ProgressBar, ProgressBar2, ProgressBarTouch, Relativeit, RoundButtonRelativeit, RoundRelativeit, Rowlist, RstDocument, Scatter, Screen, ScreenManager, ScrollView, ScrollbarMirror, Slider, SliderTouch, Spinner, Splitter, Stackit, StripLayout, Switch, ToggleButton, Tab, Tab2, Titlebar, ToActionItem, ToggleButtonBoxit, TreeView, Video, VideoPlayer, WebView**
 
