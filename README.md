@@ -14,9 +14,10 @@ If you find **SimpleKivy** useful, consider donating to help fund my education a
 
 🌐 **Donate via:**  
 - [Patreon](https://www.patreon.com/ErgoCreate/membership)
+- [GitHub Sponsors](https://github.com/sponsors/ErgoCreate)
 - [PayPal](https://www.paypal.com/cgi-bin/webscr?cmd=_s-xclick&hosted_button_id=339JUWC5BY6UN&source=url)
-<!-- - [GitHub Sponsors](your_github_sponsors_link) -->
-<!-- - [Ko-fi](your_ko-fi_link) *(or other platforms)* -->
+- [Ko-fi](https://ko-fi.com/ergocreate)
+- [Buy Me a Cofee](https://buymeacoffee.com/ErgoCreate)
 
 Thank you for your generosity! 🙏 
 
