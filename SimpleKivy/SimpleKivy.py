@@ -15,16 +15,29 @@ from .utils import markup_str
 from . import utils
 import pickle
 import types
+from . import _docs
 from kivy.uix.widget import Widget
+from inspect import signature
 
 addcolors='r g b w y gray brown orange'.split()
 iadd=-1
 liadd=len(addcolors)
+def dt_setattr(self,name,value):
+    '''
+    ## Returns a lambda function which only argument is dt, and calls setattr with the given arguments "name" and "value".
+
+    "return lambda dt:setattr(self,name,value)"
+    '''
+    return lambda dt:setattr(self,name,value)
 def __mul__Widget(self,val):
     # print(self.size,val.size,self.size_hint,val.size_hint)
     size_hint_y=self.size_hint_y
-    if not val.size_hint_y:
-        size_hint_y=val.size_hint_y
+    height=self.height
+    # if size_hint_y==val.size_hint_y==None:
+    #     height=max((height,val.height))
+    # elif not val.size_hint_y:
+    #     size_hint_y=val.size_hint_y
+    #     height=val.height
     # global iadd,addcolors,liadd
     # setattr(kel,'_isbox',kel.orientation)
     # if hasattr(self,'do_layout') and getattr(self,'orientation',None)=='horizontal':
@@ -35,20 +48,28 @@ def __mul__Widget(self,val):
     pos_hint=getattr(self,'pos_hint',{})
     # self.pos_hint={}
     # print(pos_hint)
-    if size_hint_y:
+    if size_hint_y!=None:
         return BoxitH( self, val,k=NOTKEY,pos_hint=pos_hint,
             # lcolor='g'
             )
     else:
-        return BoxitH( self, val,size='ychildren',k=NOTKEY,pos_hint=pos_hint,
+        return BoxitH( self, val,
+            size_hint_y=size_hint_y,height=height,
+            # size=f"y{height}",
+            k=NOTKEY,pos_hint=pos_hint,
             # lcolor='g'
             )
 
 def __div__Widget(self,val):
     # print(self.size,val.size,self.size_hint,val.size_hint)
     size_hint_x=self.size_hint_x
-    if not val.size_hint_x:
-        size_hint_x=val.size_hint_x
+    width=self.width
+    # if size_hint_x==val.size_hint_x==None:
+    #     width=max((width,val.width))
+    # elif not val.size_hint_x:
+    #     size_hint_x=val.size_hint_x
+    #     width=val.width
+
     # global iadd,addcolors,liadd
     # if hasattr(self,'do_layout') and getattr(self,'orientation',None)=='vertical':
     if getattr(self,'_isbox',None)=='vertical':
@@ -58,12 +79,12 @@ def __div__Widget(self,val):
     pos_hint=getattr(self,'pos_hint',{})
     # self.pos_hint={}
     # print(pos_hint)
-    if size_hint_x:
+    if size_hint_x!=None:
         return BoxitV( self, val,k=NOTKEY,pos_hint=pos_hint,
             # lcolor='g'
             )
     else:
-        return BoxitV( self, val,size='xchildren',k=NOTKEY,pos_hint=pos_hint,
+        return BoxitV( self, val,size_hint_x=size_hint_x,width=width,k=NOTKEY,pos_hint=pos_hint,
             # lcolor='g'
             )
 ids={}
@@ -80,6 +101,7 @@ def id_get(self):
 setattr(Widget,'__mul__' , __mul__Widget)
 setattr(Widget,'__truediv__' , __div__Widget)
 setattr(Widget,'id',property(id_get,id_set))
+setattr(Widget,'dt_setattr',dt_setattr)
 
 # setattr(Widget,'__add__',__mul__Widget)
 from kivy.logger import Logger
@@ -642,8 +664,27 @@ def _future_process_binds(self):
                 el.bind(**{el.on_event:self._callback})
     _future_bind=[]
 
+def locked_screen(func):
+    def wrapper(*args,**kwargs):
+        self=get_kvApp()
+        self.lock()
+        # def do(*args,**kwargs):
+        #     self.sleep_in_thread(1)
+        #     ans=func(*args,**kwargs)
+        #     self.unlock()
+        #     return ans
+        # Clock.schedule_once(lambda dt: do(),.1)
+        
+        future=self.poolt.submit(func,*args,**kwargs)
+        # future=self.poolt.submit(do,*args,**kwargs)
+        future.add_done_callback(lambda f:self.unlock())
+        # result=func(*args,**kwargs)
+        # return future.result()
+        return future
+    return wrapper
+
 def skwidget(f):
-    def wrap(*args, **kwargs):
+    def args_preprocessor(*args, **kwargs):
         sz=kwargs.get('size',None)
         max_w0=kwargs.pop('maximum_width',None)
         # size_behavior=kwargs.pop('size_behavior','none')
@@ -690,37 +731,87 @@ def skwidget(f):
         if max_w!=None:
             # print(max_w,kel)
             _post_elements['MaxWidth'].append(kel)
-
-        # #---------------------------------------------------------
-        # if size_behavior in ('none',None):
-        #     pass
-        # elif size_behavior=='normal':
-        #     kel.bind(size=lambda inst,siz:setattr(inst,'text_size',inst.size))
-        #     kel.texture_size=kel.size
-        # elif size_behavior=='text':
-        #     # this label’s height will be set to the text content
-        #     kel.size_hint_y=None
-        #     setattr(kel,'height',kel.texture_size[1])
-        #     setattr(kel,'text_size',(kel.width,None))
-
-        #     kel.bind(texture_size=lambda inst,siz:setattr(inst,'height',siz[1]))
-        #     kel.bind(width=lambda inst,v:setattr(inst,'text_size',(v, None)))
-
-            
-
-        # elif size_behavior=='texth':
-        #     # this label’s width will be set to the text content
-        #     kel.size_hint_x=None
-
-        #     setattr(kel,'width',kel.texture_size[0])
-        #     setattr(kel,'text_size',(None, kel.height))
-
-        #     kel.bind(texture_size=lambda inst,siz:setattr(inst,'width',siz[0]))
-        #     kel.bind(height=lambda inst,v:setattr(inst,'text_size',(None, v)))
-        # #---------------------------------------------------------
-
         return kel
+
+    wrap=args_preprocessor
+    # Copy all the important metadata
+    wrap.__doc__ = f.__doc__
+    wrap.__name__ = f.__name__
+    wrap.__module__ = f.__module__
+    wrap.__qualname__ = f.__qualname__
+    wrap.__annotations__ = getattr(f, '__annotations__', {})
+    
+    # Try to copy signature if available (Python 3.3+)
+    wrap.__signature__ = signature(f)
+    
+    wrap.__widget_ctor__=f.__name__
+    
+    # Copy annotations (type hints)
+    # if hasattr(f, '__annotations__'):
+    #     wrap.__annotations__ = f.__annotations__
+    if not wrap.__doc__:
+        wrap.__doc__=_docs.tbd_widfun
+    #     wrap.__doc__+=_docs.com
+    # else:
+    #     wrap.__doc__=_docs.com
+
     return wrap
+
+def _widget_ctor(f):
+    def args_preprocessor(*args, **kwargs):
+        kel = f(*args, **kwargs)
+        return kel
+    wrap=args_preprocessor
+    wrap.__doc__ = f.__doc__
+    wrap.__name__ = f.__name__
+    wrap.__module__ = f.__module__
+    wrap.__qualname__ = f.__qualname__
+    wrap.__annotations__ = getattr(f, '__annotations__', {})
+    wrap.__signature__ = signature(f)
+    wrap.__widget_ctor__=f.__name__
+    if not wrap.__doc__:
+        wrap.__doc__=_docs.tbd_widfun
+    return wrap
+
+def MiniApp(f):
+    def miniapp_func_wrapper(*args,**kwargs):
+        global ids,_future_elements,_post_elements,_future_bind, MyApp,_MiniApp
+        oids=ids.copy()
+        o_future_elements=_future_elements.copy()
+        o_future_bind=_future_bind.copy()
+        o_post_elements=_post_elements.copy()
+
+        ids={}
+        _future_elements=[]
+        _future_bind=[]
+        _post_elements={ k:[] for k in o_post_elements }
+        
+        oMyApp=MyApp
+        MyApp=_MiniApp
+        ################################
+        ans=f(*args,**kwargs)
+        ################################
+        MyApp=oMyApp
+        _future_elements=o_future_elements
+        _future_bind=o_future_bind
+        _post_elements=o_post_elements
+        ids=oids
+        
+        _future_elements.append(ans)
+
+        return ans
+    wrap=miniapp_func_wrapper
+    wrap.__doc__ = f.__doc__
+    wrap.__name__ = f.__name__
+    wrap.__module__ = f.__module__
+    wrap.__qualname__ = f.__qualname__
+    wrap.__annotations__ = getattr(f, '__annotations__', {})
+    wrap.__signature__ = signature(f)
+    wrap.__widget_ctor__=f.__name__
+    if not wrap.__doc__:
+        wrap.__doc__=_docs.tbd_widfun
+    return wrap
+
 def skwidget_only_preprocess(f):
     def wrap(*args, **kwargs):
         kwargs=_preproces(**kwargs)
@@ -772,7 +863,487 @@ if 'win' == platform.lower():
 
 # print(platform)
 
+class _MiniApp:
+    # window_is_maximized = BooleanProperty(False)
+    # _top_widget=None
+    # _subtop_widget=None
+    # def _get_tw(self):
+    #     return self._top_widget
+    # def _set_tw(self,v):
+    #     self._top_widget=v
+    #     return True
+    # top_widget=kvw.AliasProperty(_get_tw,_set_tw)
+    # def _get_stw(self):
+    #     return self._subtop_widget
+    # def _set_stw(self,v):
+    #     self._subtop_widget=v
+    #     return True
+    # subtop_widget=kvw.AliasProperty(_get_stw,_set_stw)
+    def __init__(
+        self,
+        layout=[[]],
+        title='MiniApp',
+        event_manager=None,
+        custom_titlebar=False,
+        alpha=1,
+        keep_on_top=False,
+        layout_args={},
+        icon='skdata/logo/simplekivy-icon-32.png',
+        layout_class=None,
+        do_auto_config=True,
+        k=None,
+        **kwargs
+        ):
+        if event_manager==None:
+            event_manager=_event_manager
+
+        # self._is_windows = True if platform.lower()=='win' else False
+        self.Clock=Clock
+        self.mdi=mdi
+        
+        self.kvWindow=utils.Window
+
+        # minimum_width=kwargs.pop('minimum_width',None)
+        # minimum_height=kwargs.pop('minimum_height',None)
+        # minimum_size=kwargs.pop('minimum_size',None)
+        # if minimum_width!=None:
+        #     self.minimum_width=minimum_width
+        # if minimum_height!=None:
+        #     self.minimum_height=minimum_height
+        # if minimum_size!=None:
+        #     self.minimum_size=minimum_size
+
+        self.post_actions=[]
+        
+        size=kwargs.pop('size',None)
+        location=kwargs.pop('location',None)
+        # if size:
+        #     self.post_actions.append(action(self.Resize,*size))
+        # if location:
+        #     left,top=location
+        #     if left!=None:
+        #         self.post_actions.append(action(setattr,self.kvWindow,'left',location[0]))
+        #     if top!=None:
+        #         self.post_actions.append(action(setattr,self.kvWindow,'top',location[1]))
+        # def _do_maximize(*largs):
+        #     self.window_is_maximized = True
+        # def _do_restore(*largs):
+        #     self.window_is_maximized = False
+        # self.kvWindow.bind(on_maximize=_do_maximize, on_restore=_do_restore)
+
+        # if custom_titlebar:
+        #     pass
+        #     self.kvWindow.custom_titlebar=True
+        #     try:
+        #         first_el=layout[0][0]
+        #     except:
+        #         first_el=layout[0]
+        #     self.kvWindow.set_custom_titlebar(first_el)
+        #     tbw=self.kvWindow.titlebar_widget
+        #     if hasattr(tbw,'children'):
+        #         _ensure_bttn_not_draggable(tbw.children)
+
+        self.title=title
+        self.poolt=ThreadPoolExecutor(thread_name_prefix='MiniApp')
+        self.queue={}
+        # self._leaving=False
+
+        # self._filebrowser={}
+        # self._lock=None
+
+        self._nk=0
+        class IDS(dict):
+            def __getattr__(self,name):
+                return self.__getitem__(name)
+
+        global ids
+        self.ids=IDS()
+        self._ids={}
+        if not layout_class:
+            rows=len(layout)
+            # self._layout=kvw.GridLayoutB(rows=rows,**_preproces(**layout_args))
+            self._layout=skivify(kvw.GridLayoutB,k=k,rows=rows,**layout_args)
+            max_cols = 0
+            for row in layout:
+                if len(row) > max_cols:
+                    max_cols = len(row)
+            i=0
+            for row in layout:
+                i += 1
+                elnum = -1
+                for el in row:
+                    elnum += 1
+                    kivy_el = el
+                    # if kivy_el.id in ids:
+                    #     del ids[kivy_el.id]
+                    # kivy_el.id=NOTKEY
+                    self._layout.add_widget(kivy_el)
+
+                lenrow = len(row)
+                addnvoids = 0
+                if lenrow < max_cols:
+                    addnvoids = max_cols - lenrow
+                for v in range(addnvoids):
+                    self._layout.add_widget(
+                            Fill(),
+                        )
+        else:
+            try:
+                self._layout=layout_class(k=k,**layout_args)
+            except:
+                self._layout=skivify(layout_class,k=k,**layout_args)
+            for kivy_el in layout:
+                # kivy_el.id=NOTKEY
+                # if kivy_el.id in ids:
+                #     del ids[kivy_el.id]
+                self._layout.add_widget(kivy_el)
+        self._triggers={}
+        self.event_manager=event_manager
+        self.thread_event=self.submit_thread_event
+        self.thread_event_at=self.submit_thread_event_at
+        # self.get_group=kvw.ToggleButtonBehavior.get_widgets
+        self.hidden={}
+
+        # self.remove_on_click = False
+        # def on_touch_down(instace, touch):
+        #     if self.remove_on_click and touch.button in ('left','middle','right'):
+        #         self.remove_top_widget()
+        # self._layout.bind(on_touch_down=on_touch_down)
+
+        _future_process_elements(self)
+        _post_process_elements(self)
+        _future_process_binds(self)
+
+        self.paw=self.process_added_widgets
+        self.Clock.schedule_once(lambda dt: setattr(self,'alpha',alpha))
+        
+        # self._keep_on_top=keep_on_top
+        # self.Clock.schedule_once(lambda dt: setattr(self,'keep_on_top',keep_on_top))
+
+        # self._hwnd=None
+        
+        # if icon=='skdata/logo/simplekivy-icon-32.png':
+        #     self.ico=resource_find('skdata/logo/simplekivy-icon-256.ico')
+
+        # Clock.schedule_once(lambda dt: self.on_icon(self,self.get_application_icon()))
+        # super().__init__(icon=icon,**kwargs)
+
+    def __getattr__(self,name):
+        # print(name)
+        # Redirect to parent
+        # self.APP=App.get_running_app()
+        # parent_attrs=(
+        #     'sleep_in_thread',
+        #     'on_stop',
+        #     'is_leaving',
+        #     '_leaving',
+        #     )
+        # for pattr in parent_attrs:
+        #     setattr(self,pattr,getattr(self.APP,pattr))
+
+        ####################
+        return getattr(App.get_running_app(),name)
+        # except:
+        #     raise AttributeError(f"'{self}' object has no attibute '{name}'.")
+
+    def thread_pool_new(self,name,max_workers=None):
+        self.queue[name]=ThreadPoolExecutor(max_workers=max_workers,thread_name_prefix=name)
+    def queue_new(self,name):
+        self.queue[name]=ThreadPoolExecutor(max_workers=1,thread_name_prefix=name)
+
+    def destroy_widget(self,k,default=None):
+        
+        el=self.ids.get(k,default)
+        if el:
+            del self.ids[k]
+            del self._ids[el]
+            if el.parent:
+                el.parent.remove_widget(el)
+    
+    def disable_widgets(self,*widgets):
+        for e in widgets:
+            if isinstance(e,str):
+                self[e].disabled=True
+            else:
+                e.disabled=True
+    def enable_widgets(self,*widgets):
+        for e in widgets:
+            if isinstance(e,str):
+                self[e].disabled=False
+            else:
+                e.disabled=False
+    
+    def process_widget(self,wid):
+        _future_process_elements(self)
+        _post_process_elements(self)
+        _future_process_binds(self)
+        return wid
+    def process_added_widgets(self):
+        _future_process_elements(self)
+        _post_process_elements(self)
+        _future_process_binds(self)
+
+    def dt_call(self,k,prop=None,val=None,_kw_prepro=False,ignore_errors=False,**kwargs):
+        return lambda dt: self.__call__(k=k,prop=prop,val=val,_kw_prepro=_kw_prepro,ignore_errors=ignore_errors,**kwargs)
+
+    def schedule_call_once(self,k,prop=None,val=None,timeout=0,_kw_prepro=False,ignore_errors=False,**kwargs):
+        Clock.schedule_once(lambda dt:self.__call__(k=k,prop=prop,val=val,_kw_prepro=_kw_prepro,ignore_errors=ignore_errors,**kwargs),timeout=timeout)
+
+    def __call__(self,k,prop=None,val=None,timeout=0,_kw_prepro=False,ignore_errors=False,**kwargs):
+        try:
+
+            if isinstance(k,str):
+                widget=self.ids[k]
+            else:
+                widget=k
+
+            if isinstance(prop,str):
+                if not _kw_prepro:
+                    kw=_preproces(**{prop:val})
+                    trigger=Clock.create_trigger(lambda *args:setattr(widget,prop,kw[prop]),timeout)
+                    trigger()
+                else:
+                    trigger=Clock.create_trigger(lambda *args:setattr(widget,prop,val),timeout)
+                    trigger()
+            else:
+                kwargs=_preproces(**kwargs)
+                for p,v in kwargs.items():
+                    self.__call__(k,p,v,_kw_prepro=True)
+        except Exception as e:
+            if ignore_errors:
+                pass
+            else:
+                raise e
+    def trigger_event(self,event,*args,**kwargs):
+        trigger=self._triggers.get(  event,Clock.create_trigger(  lambda *x: self.event_manager(self,event,*args,**kwargs)  )  )
+        trigger()
+    def schedule_event_once(self,event,*args,timeout=0,**kwargs):
+        ans=Clock.schedule_once(lambda dt: self.event_manager(self,event,*args,**kwargs),timeout=timeout)
+    def schedule_func_once(self,func,*args,timeout=0,**kwargs):
+        ans=Clock.schedule_once(lambda dt: func(*args,**kwargs),timeout=timeout)
+
+    def submit_thread_event_at(self,thread_name,event,*args,**kwargs):
+        if not thread_name in self.queue:
+            self.queue_new(thread_name)
+        future=self.queue[thread_name].submit(self.event_manager,self,event,*args,**kwargs)
+        return future
+    def submit_thread_event(self,event,*args,**kwargs):
+        future=self.poolt.submit(self.event_manager,self,event,*args,**kwargs)
+        return future
+    def __getitem__(self, key):
+        return self.ids[key]
+    def schedule_get_call(self,key,method,*args,**kwargs):
+        Clock.schedule_once(lambda dt:getattr(self.ids[key],method)(*args,**kwargs))
+    def keys(self):
+        return self.ids.keys()
+    def values(self):
+        return self.ids.values()
+    def items(self):
+        return self.ids.items()
+    def __contains__(self, item):
+        return item in self.ids
+
+    def __iter__(self):
+        return iter(self.ids)
+    def _callback(self,*args,**kwargs):
+        ev=self._ids[args[0]]
+        self.event_manager(self,ev)
+
+    def call_event(self,event,*args,**kwargs):
+        return self.event_manager(self,event,*args,**kwargs)
+        
+    def build(self):
+        for a in self.post_actions:
+            a()
+        Clock.schedule_once(lambda dt: self.event_manager(self,'__Start__') )
+        self._layout.app=self.app
+        self._layout.main_app=self.main_app
+        return self._layout
+    def run(self):
+        return self.build()
+
+    @property
+    def app(self):
+        return self
+
+    @property
+    def main_app(self):
+        return utils.get_kvApp()
+
+    @property
+    def id(self):
+        return self._layout.id
+
+
 class MyApp(App):
+    '''
+    A complete overhaul of how the `App` object is created.
+
+    ## Attributes
+    
+    `window_is_maximized (BooleanProperty)`: Whether the window is maximized. Can be set to maximize (`= True`) or restore (`= False`) the window.
+    
+    `top_widget (AliasProperty)`: Current widget being shown on top of all other widgets. Intended for menus, tooltips, etc.
+    
+    `subtop_widget (AliasProperty)`: Current widget being shown on top of all other widgets, besides `top_widget`. Intended for submenus.
+    
+    `hwnd (int)`: OS window id (`hwnd`) of the application.
+
+    `keep_on_top (bool)`: Wheter your application's window is shown on top of all other windows. Defaults to `False`.
+    
+    `alpha (float)`: Transparency of the window. Only works on Windows at the moment. Defaults to `1` (opaque).
+
+    `Clock`: Alias of `kivy.clock.Clock`.
+    `mdi`: Alias of `SimpleKivy.utils.mdi`.
+    `kvWindow`: Alias of `kivy.core.window.Window`.
+    
+    `ids (IDS)`: Dictionary of ids of all app widgets. You can access widgets with *variable name conformant* ids with dot notation (`app.ids.widget_id`) if the widget was created like this: `sk.Label("text",k='widget_id')`.
+
+    `event_manager`: `function` or `EventManager` instance. Must accept at least two positional arguments `app` and `event`.
+    
+    ```py
+    def evman(app, event):
+        pass
+    app=sk.MyApp(
+        ...
+        event_manager = evman
+        ...
+    )
+    ```
+
+    `ico (str)`: Path to an `*.ico` file. Needed for file dialogs (`askdirectory`, `askopenfile`, etc.) in in Windows platforms only.
+
+    `poolt`: Initialized as `ThreadPoolExecutor(thread_name_prefix='SimpleKivy')`.  You can use it to submit threaded tasks.
+
+    `queue (dict)`: Don't overwrite it. This dict is populated by the `thread_pool_new` method.
+
+    ## Methods
+
+    `process_added_widgets()`: Call this after creating `SimpleKivy` widgets. Finishes processing widgets and incorporating them to the `MyApp` instance.
+
+    `thread_pool_new(name, max_workers=None)`: Creates a thread pool with `ThreadPoolExecutor(max_workers=max_workers,thread_name_prefix=name)` and adds it to the `queue` dictionary with the name as key.
+
+    `queue_new(name)`: Creates a thread pool with a single worker (a queue) with `ThreadPoolExecutor(max_workers=1,thread_name_prefix=name)` and adds it to the `queue` dictionary with the name as key.
+
+    `hide(*key_list, shrink = True)`: Hides widgets by their key/id.
+    > - `*key_list`: Positional arguments representing all the widgets by their key which will be hidden.
+    > - `shrink (bool)`: Whether the widget's size will be set to `(0,0)` while hidden.
+
+    `unhide(*key_list, enforce = {})`: Unhides widgets.
+    > - `*key_list`: Positional arguments representing all the widgets by their key which will be unhidden.
+    > - `enforce (dict)`: Properties to enforce after unhiding. In case the widget's size is not fully restored after hiding it.
+
+    `destroy_widget(k, default = None)`: Removes a widget from the extra references kept by `SimpleKivy`, like `app.ids`.
+    
+    `add_top_widget(widget, remove_on_click=True)`: Adds a top widget to be shown on top of other widgets.
+    > - `widget (Widget)`: Widget (sets as `MyApp.top_widget` value).
+    > - `remove_on_click (bool)`: Whether the `top_widget` will be removed automatically when a mouse click event is detected.
+
+    `remove_top_widget()`: Remove the current `top_widget` if any.
+    
+    `add_top_widget(widget, remove_on_click=True)`: Adds a subtop widget to be shown on top of other widgets, besides the `top_widget`.
+    > - `widget (Widget)`: Widget (sets as `MyApp.subtop_widget` value).
+    > - `remove_on_click (bool)`: Whether the `subtop_widget` will be removed automatically when a mouse click event is detected.
+
+    `remove_subtop_widget()`: Remove the current `subtop_widget` if any.
+
+    `infotip`: Shows an infotip.
+    `infotip_schedule`: Schedules an infotip to be shown in the next frame.
+
+    `infotip_remove_schedule`: Schedules the `top_widget` to be removed in the next frame.
+
+    `disable_widgets(*widgets)`: Sets `disabled = True` of the positional arguments `*widgets` given:
+    > - `*widgets`: One or many `str` or `Widget` values. If `str`, must be a widget id.
+    
+    `enable_widgets(*widgets)`: Sets `disabled = False` of the positional arguments `*widgets` given:
+    > - `*widgets`: One or many `str` or `Widget` values. If `str`, must be a widget id.
+    
+    `Resize(width, height)`: Setes the Window size.
+
+    `bring_to_front()`: Brings the Window to the front of all other opened programs.
+
+    `dt_call(k,prop=None,val=None,_kw_prepro=False,ignore_errors=False,**kwargs)`: Returns a `lambda` function that calls `MyApp.__call__` with the given arguments.
+
+    `schedule_call_once(k,prop=None,val=None,timeout=0,_kw_prepro=False,ignore_errors=False,**kwargs)`: Schedules `MyApp.__call__` with the given arguments to be called in the next frame.
+
+    `__call__(k,prop=None,val=None,timeout=0,_kw_prepro=False,ignore_errors=False,**kwargs)`: You can call a `MyApp` instance as if it were a function to schedule property changes.
+
+    > Example:
+    ```py
+    app(k='label_widget_id',text='New text', haling='right')
+    ```
+    
+    `trigger_event(event,*args,**kwargs)`: Gets or creates a trigger for the event. The trigger created will call the `event_manager` with the given arguments.
+
+    `schedule_event_once(event,*args,timeout=0,**kwargs)`: Schedule a call of the `event_manager` for the next frame with the given arguments.
+
+    `schedule_func_once(func,*args,timeout=0,**kwargs)`: Schedule a function to be called in the next frame with the given arguments.
+
+    `submit_thread_event(event,*args,**kwargs)`: Submits a call of the `event_manager` in the `poolt` thread pool with the given arguments. Aliases: `thread_event`
+
+    `submit_thread_event_at(thread_name,event,*args,**kwargs)`: Submits a call of the `event_manager` in the `queue[thread_name]` thread pool with the given arguments. Aliases: `thread_event_at`
+
+    `call_event(event,*args,**kwargs)`: Calls the `event_manager` with the given arguments.
+
+    `keys()`: Shortcut to `MyApp.ids.keys()`.
+    `values()`: Shortcut to `MyApp.ids.values()`.
+    `items()`: Shortcut to `MyApp.ids.items()`.
+
+    `AskOpenFile(initialdir: str, filetypes: tuple or list, callback: function or None, **kw)`: Creates a `SimpleKivy` file dialog to open a file.
+    {initialdir}
+    {filetypes}
+    {filedialog_callback}
+    {filedialog_kw}
+
+    `AskDirectory`: Creates a `SimpleKivy` file dialog to open a directory.
+    {initialdir}
+    {filedialog_callback}
+    {filedialog_kw}
+
+    `askdirectory`: Creates a native platform file dialog to open a directory.
+    {initialdir}
+    {filedialog_callback}
+    {filedialog_kw}
+
+    `askopenfile`: Creates a native platform file dialog to open a file.
+    {initialdir}
+    {filetypes}
+    {filedialog_callback}
+    {filedialog_kw}
+
+    `askopenfiles`: Creates a native platform file dialog to open multiple files.
+    {initialdir}
+    {filetypes}
+    {filedialog_callback}
+    {filedialog_kw}
+
+    `asksaveasfile`: Creates a native platform file dialog to save a file as the input name and location.
+    {initialfile}
+    {filetypes}
+    {filedialog_callback}
+    {filedialog_kw}
+    
+    `popup_message`: Creates a popup widget with a message.
+
+    `lock()`: Show a lock screen that only gets dismissed when you call the `unlock` method.
+
+    `unlock()`: Dismisses the `lock` screen.
+
+    `build()`: Internal. Processes and returns the `layout` as a widget.
+
+    `minimize()`: Shortcut to `kivy.core.Window.minimize()`
+    `restore()`: Shortcut to `kivy.core.Window.restore()`
+    `maximize()`: Shortcut to `kivy.core.Window.maximize()`
+    `close()`: Closes the app.
+
+    `is_leaving()`: Whether the app is in the closing sequence. Useful when there are threaded tasks that have not finished.
+
+    `sleep_in_thread(timeout = 0)`: Similar to the `time.sleep` function, but returns immediately if the app is in the closing sequence.
+    
+    ## Kivy Bases
+    `App`
+    {base_params}
+    '''
     window_is_maximized = BooleanProperty(False)
     _top_widget=None
     _subtop_widget=None
@@ -884,9 +1455,15 @@ class MyApp(App):
         # self.bind(on_stop=lambda *args: self.event_manager(self,'__Close__'))
 
         self._filebrowser={}
+        self._lock=None
 
         self._nk=0
-        self.ids={}
+        class IDS(dict):
+            def __getattr__(self,name):
+                return self.__getitem__(name)
+        # self.ids={}
+        self.ids=IDS()
+        # self.ids.__getattr__=types.MethodType(ids.__getitem__, ids)
         self._ids={}
         if not layout_class:
             rows=len(layout)
@@ -933,6 +1510,7 @@ class MyApp(App):
         self._triggers={}
         self.event_manager=event_manager
         self.thread_event=self.submit_thread_event
+        self.thread_event_at=self.submit_thread_event_at
         self.get_group=kvw.ToggleButtonBehavior.get_widgets
         self.hidden={}
         # else:
@@ -1256,9 +1834,9 @@ class MyApp(App):
         # print(self.kvWindow.mouse_pos)
         start_pos=self.kvWindow.mouse_pos
 
-        bcolor=tooltip_args.pop('bcolor',(32/255,32/255,32/255,1))
+        bcolor=tooltip_args.pop('bcolor',(.13,.13,.13,1))
         color=tooltip_args.pop('color','#CCCCCC')
-        lcolor=tooltip_args.pop('bcolor','gray')
+        lcolor=tooltip_args.pop('lcolor','gray')
         valign=tooltip_args.pop('valign','middle')
         size=tooltip_args.pop('size','y30')
         size_behavior=tooltip_args.pop('size_behavior','texth')
@@ -1441,7 +2019,9 @@ class MyApp(App):
         _future_process_elements(self)
         _post_process_elements(self)
         _future_process_binds(self)
-    def trigger_call(self,k,prop=None,val=None,_kw_prepro=False,ignore_errors=False,**kwargs):
+    # def trigger_call(self,k,prop=None,val=None,_kw_prepro=False,ignore_errors=False,**kwargs):
+    #     return lambda dt: self.__call__(k=k,prop=prop,val=val,_kw_prepro=_kw_prepro,ignore_errors=ignore_errors,**kwargs)
+    def dt_call(self,k,prop=None,val=None,_kw_prepro=False,ignore_errors=False,**kwargs):
         return lambda dt: self.__call__(k=k,prop=prop,val=val,_kw_prepro=_kw_prepro,ignore_errors=ignore_errors,**kwargs)
     #     return 
 
@@ -1482,11 +2062,11 @@ class MyApp(App):
                 # traceback.print_exc()
             else:
                 raise e
-    def trigger_event(self,event):
-        trigger=self._triggers.get(  event,Clock.create_trigger(  lambda *args: self.event_manager(self,event)  )  )
+    def trigger_event(self,event,*args,**kwargs):
+        trigger=self._triggers.get(  event,Clock.create_trigger(  lambda *x: self.event_manager(self,event,*args,**kwargs)  )  )
         trigger()
-    def schedule_event_once(self,event,timeout=0):
-        ans=Clock.schedule_once(lambda *args: self.event_manager(self,event),timeout=timeout)
+    def schedule_event_once(self,event,*args,timeout=0,**kwargs):
+        ans=Clock.schedule_once(lambda dt: self.event_manager(self,event,*args,**kwargs),timeout=timeout)
     def schedule_func_once(self,func,*args,timeout=0,**kwargs):
         ans=Clock.schedule_once(lambda dt: func(*args,**kwargs),timeout=timeout)
 
@@ -1554,32 +2134,38 @@ class MyApp(App):
 
         kvfilelist=Filelist(initialdir=initialdir,file_types_filter=spinner_vals_d[spinner_vals[0]],k=NOTKEY)
         spinner_filetypes.root=kvfilelist
-        btn_open=ClearRoundB('Open')
-        btn_cancel=ClearRoundB('Cancel')
+        btn_open=ClearRoundB('Open',k=NOTKEY,)
+        btn_cancel=ClearRoundB('Cancel',k=NOTKEY,)
         input_selection=InputDark(k=NOTKEY)
         
         kel=BoxitV(
-            kvfilelist,
-            SeparatorH(size=(1,1)),
-            BoxitH(
-                BoxitV(
-                    Label('File name:',halign='right',size='x100')*Void(size='x4')*input_selection,
-                    Fill(),
-                    spacing=8,
-                    ),
-                BoxitV(
-                    spinner_filetypes,
-                    btn_open*Void(size='x4')*btn_cancel,
+                kvfilelist,
+                SeparatorH(size=(1,1)),
+                BoxitH(
+                    BoxitV(
+                        Label('File name:',halign='right',size='x100',k=NOTKEY,)*Void(size='x4')*input_selection,
+                        Fill(),
+                        spacing=8,
+                        # lcolor='green'
+                        k=NOTKEY,
+                        ),
+                    BoxitV(
+                        spinner_filetypes,
+                        btn_open*Void(size='x4')*btn_cancel,
+                        spacing=8,
+                        size_hint_max_x=300,
+                        # lcolor='purple'
+                        k=NOTKEY,
+                        ),
+                    
+                    size="y80",
+                    # lcolor='r',
                     spacing=4,
-                    size_hint_max_x=300,
-
+                    k=NOTKEY,
                     ),
-                
-                size="y80",
                 spacing=4,
-                ),
-            spacing=4,
-            padding=4
+                padding=4,
+                k=NOTKEY,
             )
         kel.filelist=kvfilelist
         kel.input_selection=input_selection
@@ -1657,7 +2243,39 @@ class MyApp(App):
         pop.bind(on_dismiss=on_dismiss)
         pop.open()
 
+    def lock(self):
+        if not self._lock:
+            box=BoxitAngle(Label(mdi('dots-circle'),font_size=40,markup=True,k=NOTKEY),k=NOTKEY,
+                # bcolor='dark grey'
+                )
+            def rotate_start(self,*args):
+                fps=1/30
+                self.rotate_stop()
+                Clock.schedule_interval(self.do_rotate,fps)
+            def rotate_stop(self,*args):
+                Clock.unschedule(self.do_rotate)
+            def do_rotate(self,dt):
+                self.angle=self.angle+5
+            box.do_rotate=types.MethodType(do_rotate,box)
+            box.rotate_start=types.MethodType(rotate_start,box)
+            box.rotate_stop=types.MethodType(rotate_stop,box)
+            
+            self._lock=ModalView(
+                # box,
+                auto_dismiss=False,
+                size_hint=(1,1),
+                background_color=[0,0,0,0],
+                k=NOTKEY,
+                background=''
+                # on_open=box.rotate_start,
+                # on_dismiss=box.rotate_stop,
+                )
+        self._lock.open()
+    def unlock(self):
+        if self._lock:
+            self._lock.dismiss()
     
+    @locked_screen
     def askopenfile(self,
         filetypes=(
                 ('All files', '*.*'),
@@ -1714,7 +2332,8 @@ class MyApp(App):
                     Fill(size_hint=(2,1))*BoxitH(btn_open,btn_cancel,spacing=4,size_hint_max_x=300),
                     spacing=8,
                     padding=4,
-                    size='y80'
+                    size='y80',
+                    k=NOTKEY,
                     ),
                 # size="y80",
                 # spacing=4,
@@ -1787,6 +2406,8 @@ class MyApp(App):
         input_selection.bind(on_text_validate=on_input_validate)
         self._filebrowser[_k]=pop
         pop.open()
+
+    @locked_screen
     def askdirectory(self,
         callback=None,
         **kw,
@@ -1811,6 +2432,7 @@ class MyApp(App):
             callback(filename)
         return filename
 
+    @locked_screen
     def asksaveasfile(self,
         initialfile='',
         filetypes=(
@@ -1848,6 +2470,7 @@ class MyApp(App):
         if callback and filename:
             callback(filename)
         return filename
+    @locked_screen
     def askopenfiles(self,
         filetypes=(
             ('All files', '*.*'),
@@ -1866,6 +2489,7 @@ class MyApp(App):
         multiple - when true, selection of multiple items is allowed
         '''
 
+        # def _do():
         import tkinter as tk
         root=tk.Tk()
         root.iconbitmap(self.ico)
@@ -1880,7 +2504,13 @@ class MyApp(App):
         root.destroy()
         if callback and filenames:
             callback(filenames)
+        # self.unlock()
         return filenames
+        # self.lock()
+        # self.poolt.submit(_do)
+
+    
+        
     def LoadingOpen(self):
         k='__loading__'
         if not self.__contains__(k):
@@ -1907,14 +2537,19 @@ class MyApp(App):
         if self.__contains__(k):
             self.__getitem__(k).dismiss()
 
-
-    def submit_thread_event(self,event):
+    def submit_thread_event_at(self,thread_name,event,*args,**kwargs):
+        if not thread_name in self.queue:
+            self.queue_new(thread_name)
+        future=self.queue[thread_name].submit(self.event_manager,self,event,*args,**kwargs)
+        return future
+    def submit_thread_event(self,event,*args,**kwargs):
         # def tryfun(app,event):
         #     try:
         #         app.event_manager(self,event)
         #     except:
         #         traceback.print_exc()
-        self.poolt.submit(self.event_manager,self,event)
+        future=self.poolt.submit(self.event_manager,self,event,*args,**kwargs)
+        return future
         # self.poolt.submit(tryfun,self,event)
     # def _process_element(self,el):
 
@@ -1980,8 +2615,8 @@ class MyApp(App):
         #         self.minimize()
         #     case '__Restore__':
         #         self.restore()
-    def call_event(self,event):
-        return self.event_manager(self,event)
+    def call_event(self,event,*args,**kwargs):
+        return self.event_manager(self,event,*args,**kwargs)
         
 
 
@@ -2071,6 +2706,41 @@ def TEST_WIDGET(w,event_manager=None):
 
 @skwidget
 def Label(text='',k=None,focus_behavior=False,halign='center',size_behavior='normal',valign='middle',hover_highlight=False,**kwargs):
+    '''
+    Creates a Label widget dynamically with added functionalities.
+
+    ## Dynamic Creation Parameters
+
+    {focus_behavior}
+    > Default is False.
+    
+    {hover_highlight}
+
+    ## Parameters
+    {size_behavior}
+
+    {bgline}
+
+    {common}
+
+    ## Returns
+    
+    `Label` widget created dynamically.
+
+    ## Kivy Bases
+    
+    `Label`
+
+    {base_params}
+
+    ## Properties
+    
+    ## Events
+    
+    {when_hover_highlight}
+    '''
+
+
     # kwargs=_preproces(**kwargs)
     # global _future_elements, _future_bind
     # print(kwargs)
@@ -2102,7 +2772,7 @@ def Label(text='',k=None,focus_behavior=False,halign='center',size_behavior='nor
         Clock.schedule_once(lambda dt:setattr(kel,'text_size',kel.size))
 
         # Clock.schedule_once(lambda dt:kel.texture_update())
-    elif size_behavior=='text':
+    elif size_behavior in ('text','textv'):
         # this label’s height will be set to the text content
         kel.size_hint_y=None
         Clock.schedule_once(lambda dt: setattr(kel,'height',kel.texture_size[1]))
@@ -2153,10 +2823,55 @@ def Label(text='',k=None,focus_behavior=False,halign='center',size_behavior='nor
     return kel
 
 
-
-
 @skwidget
 def PagedText(pages=[],k=None,focus_behavior=False,halign='center',size_behavior='normal',valign='middle',**kwargs):
+    '''
+    Creates a PagedText widget.
+
+    ## Dynamic Creation Parameters
+    
+    {focus_behavior}
+    > Default is False.
+
+    ## Parameters
+    
+    `pages: list`
+    > A list where each element is a string representing each page
+    > - `[str, str, ...]`: List of page strings
+    
+    {size_behavior}
+
+    {bgline}
+    
+    {common}
+
+    ## Returns
+    
+    `Label` widget created dynamically with the following modifications:
+    
+    ## Properties
+    
+    `page (NumericProperty)`: Page index. Defaults to `None`.
+    `pages (ListProperty)`: Initialized with the `pages` parameter. Defaults to `[]`.
+
+    ## Events
+    
+    `on_page(ins,val)`: Fired when the current page index is changed.
+    `on_pages(ins,val)`: Fired when the value of pages is set.
+
+    ## Methods
+    
+    `reload()`: Sets page to 0 if pages is not empty.
+    `empty()`: Sets pages to [''] and clears current text.
+    `next_page()`: Goes to the next page.
+    `previous_page()`: Goes to the previous page.
+
+    ## Kivy Bases
+    
+    `Label`
+
+    {base_params}
+    '''
     if focus_behavior:
         kvWd=kvw.FocusLabelB
     else:
@@ -2215,7 +2930,24 @@ def PagedText(pages=[],k=None,focus_behavior=False,halign='center',size_behavior
     return kel
 
 @skwidget
-def RstDocument(text='',k=None,**kwargs):
+def RstDocument(text='',k=None,enable_events=True,do_dot_subevent=True,on_event='on_ref_press',**kwargs):
+    '''
+    Creates a RstDocument widget dynamically with added functionalities.
+
+    ## Parameters
+    
+    {common}
+
+    ## Returns
+    
+    `RstDocument` widget created dynamically.
+
+    ## Kivy Bases
+    
+    `RstDocument`
+
+    {base_params}
+    '''
     from kivy.uix.rst import RstDocument as kvrstdoc
     class kvWd(kvrstdoc):
         def __init__(self, **kwargs):
@@ -2243,7 +2975,7 @@ def RstDocument(text='',k=None,**kwargs):
             # print(a,self.references)
 
 
-    kel=skivify_v2(kvWd,text=text,enable_events=True,do_dot_subevent=True,on_event='on_ref_press',k=k,**kwargs)
+    kel=skivify_v2(kvWd,text=text,enable_events=enable_events,do_dot_subevent=do_dot_subevent,on_event=on_event,k=k,**kwargs)
     # if size_behavior=='none':
     #     pass
     # elif size_behavior=='normal':
@@ -2328,30 +3060,126 @@ def extwidget_to_skwidget(class_):
 #     return widget_creator(**kwargs)
 
 @skwidget
-def CheckBox(active=False,k=None,**kwargs):
+def CheckBox(active=False,k=None,on_event='active',**kwargs):
+    '''
+    Creates a CheckBox widget dynamically with added functionalities.
+
+    ## Parameters
+    
+    {common}
+
+    ## Returns
+    
+    `CheckBox` widget created dynamically.
+
+    ## Kivy Bases
+    
+    `CheckBox`
+
+    {base_params}
+    '''
     from kivy.uix.checkbox import CheckBox as kvCheckBox
-    kel=skivify_v2(kvCheckBox,k=k,active=active,**kwargs)
+    kel=skivify(kvCheckBox,k=k,active=active,on_event=on_event,**kwargs)
     return kel
 
 @skwidget
-def Camera(k=None,**kwargs):
-    kel=skivify_v2(kvw.Camera,k=k,**kwargs)
+def Camera(k=None,legacy=False,**kwargs):
+    '''
+    Creates a custom Camera widget dynamically with added functionalities.
+
+    ## Dynamic Creation Parameters
+
+    `legacy: bool`
+    > Whether the legacy (`kivy.uix.camera.Camera`) or the new (`SimpleKivy.kvWidgets.Camera`) Camera is used as base.
+    > - `False`: Uses SimpleKivy's Camera.
+    > - `True`: Uses legacy kivy's Camera.
+    > Defaults to `False`.
+
+    {: .prompt-info }
+    > When `legacy = False`, requires the `cv2` module to work. install it with `pip install opencv-python`.
+
+    ## Parameters
+    
+    {common}
+
+    ## Returns
+    
+    `Camera` widget created dynamically.
+
+    ## Kivy Bases
+    
+    `Image` or `Camera` (when legacy).
+
+    {base_params}
+    '''
+    kel=skivify(kvw.Camera,k=k,**kwargs)
     return kel
 
 @skwidget
 def Video(source='',k=None,**kwargs):
+    '''
+    Creates a Video widget dynamically with added functionalities.
+
+    ## Parameters
+    
+    {common}
+
+    ## Returns
+    
+    `Video` widget created dynamically.
+
+    ## Kivy Bases
+    
+    `Video`
+
+    {base_params}
+    '''
     from kivy.uix.video import Video as kvWd
     kel=skivify_v2(kvWd,k=k,source=source,**kwargs)
     return kel
 
 @skwidget
 def VideoPlayer(source='',k=None,**kwargs):
+    '''
+    Creates a VideoPlayer widget dynamically with added functionalities.
+
+    ## Parameters
+    
+    {common}
+
+    ## Returns
+    
+    `VideoPlayer` widget created dynamically.
+
+    ## Kivy Bases
+    
+    `VideoPlayer`
+
+    {base_params}
+    '''
     from kivy.uix.videoplayer import VideoPlayer as kvWd
     kel=skivify_v2(kvWd,k=k,source=source,**kwargs)
     return kel
 
 @skwidget
 def Switch(active=False,k=None,enable_events=True,on_event='active',**kwargs):
+    '''
+    Creates a Switch widget dynamically with added functionalities.
+
+    ## Parameters
+    
+    {common}
+
+    ## Returns
+    
+    `Switch` widget created dynamically.
+
+    ## Kivy Bases
+    
+    `Switch`
+
+    {base_params}
+    '''
     from kivy.uix.switch import Switch as wid
     kel=skivify_v2(wid,k=k,active=active,enable_events=enable_events,on_event=on_event,**kwargs)
     return kel
@@ -2525,6 +3353,7 @@ def AddMenu(main_widget,menu_widget,position_to='mouse',touch_up_buttons="right"
     '''
     setattr(main_widget,'menu',menu_widget)
     setattr(menu_widget,'_is_menu',True)
+    setattr(menu_widget,'menu_parent',main_widget)
     # setattr(widget,'_app',utils.get_kvApp())
     # _app=utils.get_kvApp()
     # setattr(widget,'kvWindow',kvWindow)
@@ -2905,6 +3734,28 @@ def AddSubMenu(main_widget,menu_widget,on_pre_open=None):
 
 @skwidget
 def ModalView(widgets=[],k=None,enable_events=False,on_event='on_pre_open',**kwargs):
+    '''
+    Creates and fills a ModalView widget dynamically with added functionalities.
+
+    ## Parameters
+    
+    `widgets: list, Widget`
+    > Widget instance or list of widgets to be added dynamically.
+    > - `Widget`: Adds the widget as child.
+    > - `[Widget, Widget, ...]`: Adds each Widget in the list as child.
+
+    {common}
+
+    ## Returns
+    
+    `ModalView` widget created dynamically.
+
+    ## Kivy Bases
+    
+    `ModalView`
+
+    {base_params}
+    '''
     from kivy.uix.modalview import ModalView as wid
     kel=skivify_v2(wid,k=k,enable_events=enable_events,on_event=on_event,**kwargs)
     if isinstance(widgets,(list,tuple)):
@@ -2931,6 +3782,71 @@ def ComboBox(text='choice0',
     dark=False,
     flat=False,
     **kwargs):
+    '''
+    Creates a ComboBox widget (editable TextInput with a DropDown of values to choose from).
+
+    ## Dynamic Creation Parameters
+    
+    `flat: bool`
+    > Whether the dropdown button will have a flat style (see `FlatButton`):
+    > - `False`: Classic kivy widget style.
+    > - `True`: A `FlatButton` is used as the dropdown button.
+    > Default is False.
+
+    `dark: bool`
+    > Whether the textinput will have a dark style (see `TextInputDark`):
+    > - `False`: Classic kivy widget style.
+    > - `True`: A `TextInputDark` widget is used as the textinput.
+    > Default is `False`.
+
+    ## Parameters
+    
+    `text: str`
+    > Text value shown when created.
+    > - `str`: Text string.
+    > Default is `"choice0"`
+
+
+    `hint_text: str`
+    > Hint text of the widget. Shown if `text` is empty.
+    > - `str`: Text string.
+
+    `focus: bool`
+    > Wheter widget has focus in the textinput area when created.
+    > - `True`: TextInput is focused when created.
+    > - `False`: TextInput is not focused when created.
+    > Default is `False`
+
+    `values: list or sequence`
+    > A sequence where each element is a string representing the value choices.
+    > - `[str, str, ...]`: List of strings.
+    > Default value is `('choice0', 'choice1')`
+    
+    {size_behavior}
+    
+    {common}
+
+    ## Returns
+    
+    `ComboBox` widget created dynamically with the following modifications:
+    
+    ## Properties
+    
+    `text (StringProperty)`
+    `values (ListProperty)`
+    `focus (AliasProperty)`
+
+    ## Events
+    
+    `on_values(ins,val)`: Fired when changing the `values` property.
+
+    ## Kivy Bases
+    
+    `BoxLayout, TextInput, Button`
+
+    {base_params}
+    '''
+
     dd=DropDown(k=NOTKEY)
     if flat:
         btn=FlatB(mdi('menu-down'),disabled=True,k=NOTKEY,font_size=20,markup=True,width=button_width,size_hint_x=None)
@@ -2993,7 +3909,7 @@ def ComboBox(text='choice0',
                     )
                 w.bind(on_release=lambda btn: dd.select(btn.text))
                 dd.add_widget(w)
-    kel=skivify_v2( Boxtext,k=k,enable_events=enable_events,on_event=on_event, text=tin.text,values=values,**kwargs)
+    kel=skivify( Boxtext,k=k,enable_events=enable_events,on_event=on_event, text=tin.text,values=values,**kwargs)
     kel.tin=tin
     kel.btn=btn
     kel.add_widget(tin)
@@ -3023,8 +3939,36 @@ def ComboBox(text='choice0',
     return kel
 
 @skwidget
-def DatePicker(k=None,year=2020,month=1,enable_events=True,on_event='on_release',**kwargs):
-    kel=skivify_v2(kvw.DatePicker,year=year,month=month,k=k,**kwargs)
+def DatePicker(k=None,year=2020,month=1,**kwargs):
+    '''
+    Creates a DatePicker widget.
+
+    ## Parameters
+    
+    `year (int)`: Initial year. Defaults to `2020`.
+    `month (int)`: Initial month (1-12) -> (Jan-Dec). Defaults to `1`.
+    
+    {size_behavior}
+    
+    {common}
+
+    ## Returns
+    
+    `WIDGET` widget created dynamically.
+    
+    ## Properties
+    
+    `picked (list)`: List of 3 strings `["{year}", "{month}", "{day}"]` containing the last date selected. Defaults to `["", "", ""]`.
+    `months (list)`: List of month names `["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"]`.
+
+    ## Kivy Bases
+    
+    `BoxLayout`
+
+    {base_params}
+    '''
+
+    kel=skivify(kvw.DatePicker,year=year,month=month,k=k,**kwargs)
     return kel
 
 Calendar=DatePicker
@@ -3054,7 +3998,7 @@ def JoinLabel(texts=['text1','text2','text3'],k=None,focus_behavior=False,**kwar
             self.text=' '.join(texts)
 
 
-    kel=_(texts=texts,**kwargs)
+    kel=skivify(_,texts=texts,**kwargs)
 
 
     
@@ -3148,12 +4092,37 @@ def LargeText(text='',k=None,focus_behavior=False,
 
 @skwidget
 def Boxit(*widgets,k=None,base_cls=None,**kwargs):
+    '''
+    Dynamic layout constructor. The type of layout is specified by `base_cls`.
+
+    ## Dynamic Creation Parameters
+    
+    `base_cls: WidgetType`
+    > Widget class to use as base for the constructor:
+    > Default is `None`, which sets `SimpleKivy.kvWidgets.BoxlayoutB` as the base class for the layout constructor.
+
+    ## Parameters
+    
+    {widgets}
+
+    {common}
+
+    ## Returns
+    
+    Widget instance of type defined by `base_cls` with `*widgets` as children.
+
+    ## Kivy Bases
+    
+    Depends on `base_cls`.
+
+    {base_params}
+    '''
     # kwargs=_preproces(**kwargs)
     if base_cls==None:
         kvWd=kvw.BoxLayoutB
     else:
         kvWd=base_cls
-    kel=skivify_v2(kvWd,k=k,**kwargs)
+    kel=skivify(kvWd,k=k,**kwargs)
 
     # kel.id=k
 
@@ -3171,6 +4140,28 @@ def Splitter(widget=None,k=None,sizable_from = 'right',**kwargs):
 
 @skwidget
 def BoxitH(*widgets,k=None,orientation='horizontal',**kwargs):
+    '''
+    Dynamic `BoxLayout` constructor with `orientation = "horizontal"` set as default.
+
+    ## Parameters
+    
+    {widgets}
+
+    {common}
+
+    {bgline}
+
+    ## Returns
+    
+    `BoxLayout` created dynamically with `*widgets` added as children during creation.
+
+    ## Kivy Bases
+    
+    `BoxLayout`
+
+    {base_params}
+    '''
+
     # kwargs=_preproces(**kwargs)
     kel=skivify_v2(kvw.BoxLayoutB,k=k,orientation=orientation,**kwargs)
 
@@ -3186,12 +4177,71 @@ def BoxitH(*widgets,k=None,orientation='horizontal',**kwargs):
 
 @skwidget
 def LabelCheck(text='checkbox',halign='left',valign='middle',enable_events=False,on_event='active',cwidth=40,active=False,k=None,**kwargs):
-    kel=skivify_v2(kvw.LabelCheck,text=text,active=active,cwidth=cwidth,k=k,halign=halign,valign=valign,enable_events=enable_events,on_event=on_event,**kwargs)
+    '''
+    Creates a LabelCheck widget dynamically with added functionalities.
+
+    ## Parameters
+    
+    `text (str)`: Text value shown when created. Default is `"checkbox"`.
+
+    `halign (str)`: Horizontal text alignment. It can be one of `"left", "center", "right"`. Default is `"left"`.
+
+    `valign (str)`: Vertical text alignment. It can be one of `"top", "middle", "bottom"`. Default is `"middle"`.
+
+    `active (bool)`: Checkbox state. Default is `False`.
+
+    `cwidth (int)`: Width of the checkbox. Default is `40`
+
+    {common}
+
+    ## Returns
+    
+    `WIDGET` widget created dynamically.
+
+    ## Kivy Bases
+    
+    `BoxLayout, Label, CheckBox`
+
+    {base_params}
+    '''
+    kel=skivify(kvw.LabelCheck,text=text,active=active,cwidth=cwidth,k=k,halign=halign,valign=valign,enable_events=enable_events,on_event=on_event,**kwargs)
     return kel
     
 
 @skwidget
 def HoverBoxit(*widgets,k=None,enable_events=True,hover_highlight=False,do_dot_subevent=True,on_event=('on_enter','on_leave'),**kwargs):
+    '''
+    Dynamic `BoxLayout` constructor.
+
+    ## Dynamic Creation Parameters
+    
+    {hover_highlight}
+
+    ## Parameters
+    
+    {widgets}
+
+    {common}
+
+    {bgline}
+
+    ## Returns
+    
+    `BoxLayout` created dynamically with `*widgets` added as children during creation.
+
+    ## Kivy Bases
+    
+    `BoxLayout`
+
+    {base_params}
+
+    ## Properties
+
+    ## Events
+    
+    {when_hover_highlight}
+    '''
+
     # kwargs=_preproces(**kwargs)
     # kvWd=kvw.BoxLayoutB
     if hover_highlight:
@@ -3203,7 +4253,7 @@ def HoverBoxit(*widgets,k=None,enable_events=True,hover_highlight=False,do_dot_s
             pass
 
     # kel=kvWd(orientation=orientation,**kwargs)
-    kel=skivify_v2(kvWd,k=k,enable_events=enable_events,do_dot_subevent=do_dot_subevent,on_event=on_event,**kwargs)
+    kel=skivify(kvWd,k=k,enable_events=enable_events,do_dot_subevent=do_dot_subevent,on_event=on_event,**kwargs)
 
 
     # kel.id=k
@@ -3218,6 +4268,31 @@ def HoverBoxit(*widgets,k=None,enable_events=True,hover_highlight=False,do_dot_s
 
 @skwidget
 def Grid(layout=[[]],k=None,navigation_behavior=False,**kwargs):
+    '''
+    Dynamic `BoxLayout` constructor.
+
+    ## Dynamic Creation Parameters
+    
+    {grid_navigation_behavior}
+
+    ## Parameters
+    
+    {layout}
+
+    {common}
+
+    {bgline}
+
+    ## Returns
+    
+    `GridLayout` created dynamically with `layout` widgets added as children during creation.
+
+    ## Kivy Bases
+    
+    `GridLayout`
+
+    {base_params}
+    '''
     # kwargs=_preproces(**kwargs)
 
     
@@ -3271,11 +4346,42 @@ def Grid(layout=[[]],k=None,navigation_behavior=False,**kwargs):
 
 _web_started=False
 @skwidget
-def WebView(url='https://www.google.com',k=None,
-    # maximum_width=None,
-    # enable_events=True,do_dot_subevent=True,on_event=('on_enter','on_leave'),
+def WebView(url="https://www.google.com",k=None,
     orientation='horizontal',
     **kwargs):
+    '''
+    Attempt of a WebView widget. Attaches an internet browser window to the current kivy window. Depends on `pywebview`. It's like runing your program alongside an internet browser.
+    In essence, it is an external window that follows an empty BoxLayout and changes the window being focused when entering and leaving the box with the mouse.
+
+    {: .prompt-warning }
+    > Experimental. **Windows only**. Expect window flickering. You cannot show any widget on top of the `WebView` widget.
+
+
+    ## Parameters
+    
+    `url (str)`: Initial url of the web window. Defaults to `"https://www.google.com"`.
+
+    {common}
+
+    {bgline}
+
+    ## Returns
+    
+    `WebView` created dynamically.
+
+    ## Kivy Bases
+    
+    `BoxLayout`
+
+    `window (webview.Window)`: Represents a window that hosts the webview. Visit [pywebview's documentation](https://pywebview.flowrl.com/) for more information.
+
+    {base_params}
+
+    ## Events
+    
+    {events_hover}
+    '''
+    
     
     # from . import webview
     from .webview_enhance import enhance
@@ -3407,7 +4513,7 @@ def WebView(url='https://www.google.com',k=None,
 
 
 
-    kel=skivify_v2(kvWd,k=k,
+    kel=skivify(kvWd,k=k,
         # enable_events=enable_events,do_dot_subevent=do_dot_subevent,on_event=on_event,
         # unfocus_on_touch=True,
         **kwargs)
@@ -3434,6 +4540,44 @@ def WebView(url='https://www.google.com',k=None,
 @skwidget
 def External(title="External window title",hwnd=None,k=None,
     **kwargs):
+    '''
+    Attaches an external window to the current kivy window. It's like runing your program alongside another program.
+    In essence, it is an external window that follows an empty BoxLayout and changes the window being focused when entering and leaving the box with the mouse.
+
+    {: .prompt-warning }
+    > Experimental. **Windows only**. Expect window flickering. You cannot show any widget on top of the `External` widget.
+
+
+    ## Parameters
+    
+    `hwnd: int, None`: 
+    > Windows' `hwnd` of a program to be attached to your window. Defaults to `None`
+    > - `int`: External program's `hwnd` id.
+    > - `None`: The `title` parameter will be used instead to find the external window.
+    > Default is `None`.
+
+    `title (str)`: External window title. Used to find the external window when `hwnd` value is `None`. Default is `"External window title"`
+
+    {common}
+
+    {bgline}
+
+    ## Returns
+    
+    `WIDGET` widget created dynamically.
+
+    ## Kivy Bases
+    
+    `BoxLayout`
+
+    `ewin (Simplekivy.Native.ExternalWindow)`: Manages changes on the box and keeps the external program on top of it.
+
+    {base_params}
+
+    ## Events
+    
+    {events_hover}
+    '''
     import threading
     from .native import ExternalWindow,find_hwnd_by_title,set_constant_window_colors
     class kvWd(kvb.HoverBehavior,kvw.BoxLayoutB):
@@ -3495,7 +4639,7 @@ def External(title="External window title",hwnd=None,k=None,
     
     return kel
     
-
+@_widget_ctor
 def TitlebarCloseButton(markup=True,k=NOTKEY,size="x44",hover_highlight=True,lcolor='',bcolor_down='red',**kwargs):
     kel= FlatButton(text=kwargs.pop('text',mdi('window-close')),
         markup=markup,k=k,size=size,lcolor=lcolor,hover_highlight=hover_highlight,bcolor_down=bcolor_down,
@@ -3511,6 +4655,7 @@ def TitlebarCloseButton(markup=True,k=NOTKEY,size="x44",hover_highlight=True,lco
 
     return kel
 
+@_widget_ctor
 def TitlebarRestoreButton(text_states=(None,None),markup=True,k=NOTKEY,size="x44",lcolor='',hover_highlight=True,bcolor_down='gray',**kwargs):
 
     if text_states[1]:
@@ -3559,6 +4704,7 @@ def TitlebarRestoreButton(text_states=(None,None),markup=True,k=NOTKEY,size="x44
 
     return kel
 
+@_widget_ctor
 def TitlebarMinimizeButton(markup=True,k=NOTKEY,size="x44",lcolor='',hover_highlight=True,bcolor_down='gray',**kwargs):
     kel=FlatButton(text=kwargs.pop('text',mdi('window-minimize')),
         markup=markup,k=k,size=size,lcolor=lcolor,hover_highlight=hover_highlight,bcolor_down=bcolor_down,
@@ -3568,6 +4714,7 @@ def TitlebarMinimizeButton(markup=True,k=NOTKEY,size="x44",lcolor='',hover_highl
     
     return kel
 
+@_widget_ctor
 def TitlebarTitle(k=NOTKEY,padding=[8,0],halign='left',**kwargs):
     kel=LargeText(k=k,padding=padding,halign=halign,font_size=kwargs.pop("font_size",12),**kwargs)
 
@@ -3580,6 +4727,7 @@ def TitlebarTitle(k=NOTKEY,padding=[8,0],halign='left',**kwargs):
 
     return kel
 
+@_widget_ctor
 def TitlebarIcon(**kwargs):
     kel=Image(async_load=False,k=NOTKEY,size_hint_x=None,width=32,**kwargs)
     def on_run(dt):
@@ -3594,9 +4742,22 @@ def TitlebarIcon(**kwargs):
     return kel
 
 @skwidget
-def Titlebar(k='titlebar',size="y32",padding=[4,4],orientation='horizontal',**kwargs):
-    # kwargs=_preproces(**kwargs)
-    kel=skivify_v2(kvw.BoxLayoutB,k=k,size=size,orientation=orientation,padding=padding,**kwargs)
+def Titlebar(k='titlebar',padding=[4,4],orientation='horizontal',**kwargs):
+    '''
+    Example of a custom titlebar.
+    Must be the first widget in the `layout` and `custom_titlebar = True` when creating the app.
+    Set a `size` and `size_hint` because by default it doesn't have one.
+
+    ## SimpleKivy Bases
+    `TitlebarIcon, TitlebarTitle, Fill, MinimizeButton, RestoreButton, CloseButton`
+
+    ## Kivy Bases
+    `Boxlayout`
+    '''
+
+    # size=kwargs.pop('size','y32')
+    kwargs=_preproces(**kwargs)
+    kel=skivify(kvw.BoxLayoutB,k=k,orientation=orientation,padding=padding,**kwargs)
 
     # kel.id=k
 
@@ -3650,15 +4811,57 @@ def Titlebar(k='titlebar',size="y32",padding=[4,4],orientation='horizontal',**kw
 # Boxit=BoxitH
 @skwidget
 def Pageit(*widgets,k=None,**kwargs):
-    kel=skivify_v2(kvw.PageLayoutB,k=k,**kwargs)
+    '''
+    Dynamic `PageLayout` constructor.
+
+    ## Parameters
+    
+    {widgets}
+
+    {common}
+
+    {bgline}
+
+    ## Returns
+    
+    `PageLayout` created dynamically with `*widgets` added as children during creation.
+
+    ## Kivy Bases
+    
+    `PageLayout`
+
+    {base_params}
+    '''
+
+    kel=skivify(kvw.PageLayoutB,k=k,**kwargs)
     # kel.id=k
     for w in widgets:
         kel.add_widget(w)
     return kel
 @skwidget
 def BoxitV(*widgets,k=None,orientation='vertical',**kwargs):
-    # kwargs=_preproces(**kwargs)
-    kel=skivify_v2(kvw.BoxLayoutB,k=k,orientation=orientation,**kwargs)
+    '''
+    Dynamic `BoxLayout` constructor with `orientation = "vertical"` set as default.
+
+    ## Parameters
+    
+    {widgets}
+
+    {common}
+
+    {bgline}
+
+    ## Returns
+    
+    `BoxLayout` created dynamically with `*widgets` added as children during creation.
+
+    ## Kivy Bases
+    
+    `BoxLayout`
+
+    {base_params}
+    '''
+    kel=skivify(kvw.BoxLayoutB,k=k,orientation=orientation,**kwargs)
 
     # kel.id=k
 
@@ -3671,6 +4874,27 @@ def BoxitV(*widgets,k=None,orientation='vertical',**kwargs):
 
 @skwidget
 def Stackit(*widgets,k=None,orientation='lr-tb',**kwargs):
+    '''
+    Dynamic `StackLayout` constructor.
+
+    ## Parameters
+    
+    {widgets}
+
+    {common}
+
+    {bgline}
+
+    ## Returns
+    
+    `StackLayout` created dynamically with `*widgets` added as children during creation.
+
+    ## Kivy Bases
+    
+    `StackLayout`
+
+    {base_params}
+    '''
     kel=skivify_v2(kvw.StackLayoutB,k=k,orientation=orientation,**kwargs)
 
     for w in widgets:
@@ -3679,6 +4903,27 @@ def Stackit(*widgets,k=None,orientation='lr-tb',**kwargs):
 
 @skwidget
 def Relativeit(*widgets,k=None,**kwargs):
+    '''
+    Dynamic `RelativeLayout` constructor.
+
+    ## Parameters
+    
+    {widgets}
+
+    {common}
+
+    {bgline}
+
+    ## Returns
+    
+    `RelativeLayout` created dynamically with `*widgets` added as children during creation.
+
+    ## Kivy Bases
+    
+    `RelativeLayout`
+
+    {base_params}
+    '''
     kel=skivify_v2(kvw.RelativeLayoutB,k=k,**kwargs)
 
     for w in widgets:
@@ -3687,6 +4932,27 @@ def Relativeit(*widgets,k=None,**kwargs):
 
 @skwidget
 def Floatit(*widgets,k=None,**kwargs):
+    '''
+    Dynamic `FloatLayout` constructor.
+
+    ## Parameters
+    
+    {widgets}
+
+    {common}
+
+    {bgline}
+
+    ## Returns
+    
+    `FloatLayout` created dynamically with `*widgets` added as children during creation.
+
+    ## Kivy Bases
+    
+    `FloatLayout`
+
+    {base_params}
+    '''
     kel=skivify_v2((kvw.BgLine,kvw.FloatLayout),k=k,**kwargs)
 
     for w in widgets:
@@ -3695,6 +4961,29 @@ def Floatit(*widgets,k=None,**kwargs):
 
 @skwidget
 def RoundRelativeit(*widgets,k=None,**kwargs):
+    '''
+    Dynamic `RelativeLayout` constructor with rounded corners for the border line and background color.
+
+    ## Parameters
+    
+    {widgets}
+
+    {bgline}
+
+    {rounded}
+
+    {common}
+
+    ## Returns
+    
+    `RelativeLayout` created dynamically with `*widgets` added as children during creation.
+
+    ## Kivy Bases
+    
+    `RelativeLayout`
+
+    {base_params}
+    '''
     kel=skivify_v2(kvw.RoundCornerLayout,k=k,**kwargs)
 
     # kel.id=k
@@ -3710,6 +4999,35 @@ def RoundButtonRelativeit(*widgets,k=None,enable_events=True,on_event='on_releas
     # bcolor=[.345, .345, .345, 0],
     bcolor_down=[.2, .64, .8, 1],
     **kwargs):
+    '''
+    Dynamic `RelativeLayout` constructor with ButtonBehavior and rounded corners for the border line and background color.
+
+    ## Parameters
+    
+    {widgets}
+
+    {bgline}
+
+    {rounded}
+
+    {common}
+
+    ## Returns
+    
+    `RelativeLayout` created dynamically with `*widgets` added as children during creation.
+
+    ## Kivy Bases
+    
+    `RelativeLayout`
+
+    {base_params}
+
+    ## Properties
+
+    ## Events
+
+    {when_hover_highlight}
+    '''
     kvWd=kvw.RoundBLayout
 
     if focus_behavior:
@@ -3762,7 +5080,26 @@ def RoundButtonRelativeit(*widgets,k=None,enable_events=True,on_event='on_releas
 #     return kel
 
 @skwidget
-def Boxit_scatter(*widgets,k=None,**kwargs):
+def Scatterit(*widgets,k=None,**kwargs):
+    '''
+    Dynamic `ScatterLayout` constructor.
+
+    ## Parameters
+    
+    {widgets}
+
+    {common}
+
+    ## Returns
+    
+    `ScatterLayout` created dynamically with `*widgets` added as children during creation.
+
+    ## Kivy Bases
+    
+    `ScatterLayout`
+
+    {base_params}
+    '''
     # kwargs=_preproces(**kwargs)
 
     from kivy.uix.scatterlayout import ScatterLayout as kvWd
@@ -3774,7 +5111,7 @@ def Boxit_scatter(*widgets,k=None,**kwargs):
 
     # _future_elements.append(kel)
     return kel
-Scatterit=Boxit_scatter
+# Scatterit=Boxit_scatter
 
 @skwidget
 def ButtonBoxitAngle(*widgets,k=None,angle=0,enable_events=True,on_event="on_release",**kwargs):
@@ -3862,7 +5199,7 @@ def Scatter(widget,k=None,**kwargs):
 #     return kel
 
 @skwidget
-def Tab2(pannels={},
+def Tab2(panels={},
         k=None,
         tab_pos = 'top_left',
         do_default_tab=False,
@@ -3871,11 +5208,55 @@ def Tab2(pannels={},
         strip_args={'bcolor':[.2, .64, .8, 1],'pos_hint':{'bottom':0}},
         **kwargs
         ):
+    '''
+    Dynamic `WIDGET` widget constructor. An enhanced version of the `Tab` widget with a modern look.
+
+    ## Parameters
+    
+    `panels: dict`
+    > Defines the content of the tabbed panel.
+    > - `{"{tab_name}": Widget, ...}`: For each `key: value` pair, a TabbedPanelItem is created with `text = "{tab_name}"` and Widget added as child. Each TabbedPanelItem created is added as child to the main TabbedPanel widget.
+    > Defaults to `{}`.
+
+    > Example:
+    ```py
+    sk.WIDGET(
+            panels={
+                "Header1": sk.Label('First tab content'),
+                "Header2": sk.Button('Second tab content')
+            }
+        )
+    ```
+
+    `head_label_args: dict`
+    > Defines the properties of the headers, which are created as `sk.Label(text = "{tab_name}", k = sk.NOTKEY, **head_label_args)`.
+    > - `{"{prop_name}": prop_value, ...}`: Dictionary of properties.
+    > Defaults to `{'size_behavior': 'texth', 'padding': [16,0,16,0], 'lcolor': 'gray'}`.
+
+    `content_box_args: dict`
+    > Defines the properties of the the content box, which is created as a `SimpleKivy.kvWidgets.BoxLayoutB(**content_box_args)` widget.
+    > - `{"{prop_name}": prop_value, ...}`: Dictionary of properties.
+    > Defaults to `{'lcolor': 'gray', 'padding': 4}`.
+
+    {common}
+
+    ## Returns
+    
+    New `TabbedPanel-like` widget created dynamically with `panels` processed as displayed content during creation.
+
+    ## Kivy Bases
+    
+    `TabbedPanel`
+    
+    `current: (str)`: `Text value of the current tab selected. Setting this property changes the current tab.
+
+    {base_params}
+    '''
     # kel=kvw.BoxLayoutB(orientation="vertical",**kwargs)
 
     class kvWd(kvw.RelativeLayout):
         # orientation=kvw.OptionProperty("vertical",options=("vertical","horizontal")):
-        pannels=kvw.ObjectProperty({})
+        panels=kvw.ObjectProperty({})
         tab_pos=kvw.OptionProperty('top_left',options=('left_top', 'left_mid', 'left_bottom', 'top_left', 'top_mid', 'top_right', 'right_top', 'right_mid', 'right_bottom', 'bottom_left', 'bottom_mid', 'bottom_right'))
         do_default_tab=kvw.BooleanProperty(False)
         # def _get_headers(self):
@@ -3892,9 +5273,9 @@ def Tab2(pannels={},
                 spacing=6,
                 # lcolor='red'
                 )
-            # self.bind(pannels=lambda ins,val:setattr(self._headbox,'width',len(val)))
-            # self.bind(pannels=lambda ins,val:Clock.schedule_once())
-            # self.setter('pannels')(self,self.pannels)
+            # self.bind(panels=lambda ins,val:setattr(self._headbox,'width',len(val)))
+            # self.bind(panels=lambda ins,val:Clock.schedule_once())
+            # self.setter('panels')(self,self.panels)
             # setattr(self._headbox,'width',len(val))
 
             self.add_widget(self._headbox)
@@ -3912,8 +5293,8 @@ def Tab2(pannels={},
             self.content_box=kvw.BoxLayoutB(**content_box_args)
             self.add_widget(self.content_box)
 
-            # print(self.pannels)
-            self._sman=Screens(self.pannels,k=NOTKEY,transition='no')
+            # print(self.panels)
+            self._sman=Screens(self.panels,k=NOTKEY,transition='no')
             self.content_box.add_widget(self._sman)
             self.bind(size=self._up_bbox_posV)
 
@@ -3923,7 +5304,7 @@ def Tab2(pannels={},
             self.headers={}
             self._strip_color=strip_args.get('bcolor',[.2, .64, .8, 0])
             head_lcolor=head_label_args.pop('lcolor','gray')
-            for k,v in self.pannels.items():
+            for k,v in self.panels.items():
                 ik+=1
                 lbl=Label(k,k=NOTKEY,**head_label_args)
                 sep=SeparatorH(k=NOTKEY,**strip_args)
@@ -4069,15 +5450,17 @@ def Tab2(pannels={},
 
         current=kvw.AliasProperty(_get_current,_set_current)
         current_tab=kvw.AliasProperty(_get_current_tab)
-    kel=skivify_v2(kvWd,tab_pos=tab_pos,do_default_tab=do_default_tab,pannels=pannels,k=k,**kwargs)
+    kel=skivify_v2(kvWd,tab_pos=tab_pos,do_default_tab=do_default_tab,panels=panels,k=k,**kwargs)
     return kel
+
+
 
 
 
 
 #     # kel.id=k
 
-#     kel=skivify_v2(kvWd,k=k,pannels=pannels,tab_pos=tab_pos,do_default_tab=do_default_tab,**kwargs)
+#     kel=skivify_v2(kvWd,k=k,panels=panels,tab_pos=tab_pos,do_default_tab=do_default_tab,**kwargs)
 
 #     # _future_elements.append(kel)
 #     return kel
@@ -4086,34 +5469,69 @@ def Tab2(pannels={},
 
 @skwidget
 def Tab(
-            pannels={},
+            panels={},
             k=None,
             tab_pos = 'top_left',
             do_default_tab=False,
             **kwargs
         ):
+    '''
+    Dynamic `WIDGET` widget constructor.
+
+    ## Parameters
+    
+    `panels: dict`
+    > Defines the content of the TabbedPanel.
+    > - `{"{tab_name}": Widget, ...}`: For each `key: value` pair, a TabbedPanelItem is created with `text = "{tab_name}"` and Widget added as child. Each TabbedPanelItem created is added as child to the main TabbedPanel widget.
+    > Defaults to `{}`.
+
+    > Example:
+    ```py
+    sk.WIDGET(
+            panels={
+                "Header1": sk.Label('First tab content'),
+                "Header2": sk.Button('Second tab content')
+            }
+        )
+    ```
+
+    {common}
+
+    ## Returns
+    
+    `TabbedPanel` created dynamically with `panels` processed as displaued content during creation.
+
+    ## Kivy Bases
+    
+    `TabbedPanel`
+    
+    `current: (str)`: `Text value of the current tab selected. Setting this property changes the current tab.
+
+    {base_params}
+    '''
+
     # kwargs=_preproces(**kwargs)
     # global _future_elements, _future_bind
     class kvWd(kvw.TabbedPanel):
-        _pannels={}
+        _panels={}
 
         # @property
         def _get_current(self):
-            # print(self._pannels)
+            # print(self._panels)
             return self.current_tab.text
         # @current.setter
         def _set_current(self,v):
             try:
-                self.switch_to(self._pannels[v])
+                self.switch_to(self._panels[v])
             except:
                 for ti in self.tab_list:
-                    self._pannels[ti.text]=ti
-                self.switch_to(self._pannels[v])
+                    self._panels[ti.text]=ti
+                self.switch_to(self._panels[v])
         current=kvw.AliasProperty(_get_current,_set_current)
 
     # kel=kvw.TabbedPanel(do_default_tab=do_default_tab,tab_pos=tab_pos,**kwargs)
     kel=skivify_v2(kvWd,k=k,do_default_tab=do_default_tab,tab_pos=tab_pos,**kwargs)
-    for k,v in pannels.items():
+    for k,v in panels.items():
         ti=kvw.TabbedPanelItem(text=k)
         ti.add_widget(v)
         kel.add_widget(ti)
@@ -4159,6 +5577,41 @@ def Tab(
 
 @skwidget
 def Button(text='button',enable_events=True,hover_highlight=False,k=None,on_event='on_release', **kwargs):
+    '''
+    Creates a WIDGET widget dynamically with added functionalities.
+
+    ## Dynamic Creation Parameters
+    
+    {hover_highlight}
+    > Default is `False`
+
+    ## Parameters
+    
+    {bg_state}
+
+    {common}
+
+    ## Returns
+    
+    `WIDGET` widget created dynamically.
+
+    ## Kivy Bases
+    
+    `Boutton`
+
+    {base_params}
+    
+    ## Properties
+
+    {button_properties}
+
+    ## Events
+    
+    {events_button}
+
+    {when_hover_highlight}
+    '''
+
     kvWd=kvw.Button
     if hover_highlight:
         class _(kvWd,kvb.HoverHighlightBehavior):
@@ -4169,6 +5622,7 @@ def Button(text='button',enable_events=True,hover_highlight=False,k=None,on_even
     if k==None and text:
         kel.id=text
     return kel
+
 B=Button
 
 @skwidget
@@ -4472,13 +5926,55 @@ def Image(
 
 
 @skwidget
-def FlatButton(text='button',
+def FlatButton(text='flat_button',
     lcolor=[.5,.5,.5,1],
     bcolor_normal=[.345, .345, .345, 0],
     bcolor_down=[.2, .64, .8, 1],
     markup=True,
     focus_behavior=False,hover_highlight=False,enable_events=True,on_event='on_release',k=None,touchripple=False,
     **kwargs):
+    '''
+    Creates a *Flat-style* button widget dynamically with added functionalities.
+
+    ## Dynamic Creation Parameters
+
+    {focus_behavior}
+    > Default is False.
+    
+    {hover_highlight}
+    > Default is `False`
+
+    {touchripple}
+    > Default is `False`
+
+    ## Parameters
+    
+    {bgline_state}
+
+    {common}
+
+    ## Returns
+    
+    `WIDGET` widget created dynamically.
+
+    ## Kivy Bases
+    
+    `BoxLayout, Label`
+
+    {base_params}
+    
+    ## Properties
+
+    {button_properties}
+
+    ## Properties
+
+    ## Events
+    
+    {events_button}
+
+    {when_hover_highlight}
+    '''
     if touchripple:
         # class _(kvw.TouchRippleButtonBehavior,kvw.BgLineState,kvw.BoxLayout):
         #     # bcolor_down=kvw.ColorProperty([.2, .64, .8, 1])
@@ -4543,20 +6039,64 @@ def FlatButton(text='button',
     return kel
 FlatB=FlatButton
 
-def ClearButton(*args,hover_highlight=True,lcolor='',markup=True,**kwargs):
-    return FlatButton(*args,hover_highlight=hover_highlight,lcolor=lcolor,markup=markup,**kwargs)
+@_widget_ctor
+def ClearButton(text='clearbutton',hover_highlight=True,lcolor='',markup=True,**kwargs):
+    '''
+    {inits_FlatButton}
+    '''
+    return FlatButton(text=text,hover_highlight=hover_highlight,lcolor=lcolor,markup=markup,**kwargs)
 ClearB=ClearButton
 
 
 @skwidget
-def FlatRoundButton(text='button',
+def FlatRoundButton(text='flat_round_btn',
     lcolor=[.5,.5,.5,1],
     bcolor_normal=[.345, .345, .345, 0],
     bcolor_down=[.2, .64, .8, 1],
     markup=True,
     focus_behavior=False,hover_highlight=False,enable_events=True,on_event='on_release',k=None,
     **kwargs):
+    '''
+    Creates a *Flat-style rounded* button widget dynamically with added functionalities.
 
+    ## Dynamic Creation Parameters
+
+    {focus_behavior}
+    > Default is False.
+    
+    {hover_highlight}
+    > Default is `False`
+
+    ## Parameters
+
+    {rounded}
+    
+    {bgline_state}
+
+    {common}
+
+    ## Returns
+    
+    `WIDGET` widget created dynamically.
+
+    ## Kivy Bases
+    
+    `RelativeLayout, Label`
+
+    {base_params}
+    
+    ## Properties
+
+    {button_properties}
+
+    ## Properties
+
+    ## Events
+    
+    {events_button}
+
+    {when_hover_highlight}
+    '''
     kvWd=kvw.FlatRoundButtonA
         # kwargs['bcolor_normal']=bcolor_normal
 
@@ -4595,14 +6135,54 @@ def FlatRoundButton(text='button',
 FlatRoundB=FlatRoundButton
 
 
-def ClearRoundButton(*args,hover_highlight=True,lcolor='gray',markup=True,**kwargs):
+@_widget_ctor
+def ClearRoundButton(text='clear_round_btn',hover_highlight=True,lcolor='gray',markup=True,**kwargs):
+    '''
+    {inits_FlatRoundButton}
+    '''
     return FlatRoundButton(*args,hover_highlight=hover_highlight,lcolor=lcolor,markup=markup,**kwargs)
 
 ClearRoundB=ClearRoundButton
 
 @skwidget
 def ButtonBoxit(*widgets,focus_behavior=False,lwidth=1,hover_highlight=False,enable_events=True,k=None,on_event='on_release', **kwargs):
+    '''
+    Creates a `BoxLayout` widget with `ButtonBehavior` dynamically with added functionalities.
+
+    ## Dynamic Creation Parameters
+
+    {focus_behavior}
+    > Default is False.
     
+    {hover_highlight}
+    > Default is `False`
+
+    ## Parameters
+    
+    {bgline_state}
+
+    {common}
+
+    ## Returns
+    
+    `WIDGET` widget created dynamically.
+
+    ## Kivy Bases
+    
+    `BoxLayout`
+
+    {base_params}
+    
+    ## Properties
+
+    {button_properties}
+
+    ## Events
+    
+    {events_button}
+
+    {when_hover_highlight}
+    '''
     kvWd=kvw.BBoxLayout
 
     if focus_behavior:
@@ -4614,7 +6194,7 @@ def ButtonBoxit(*widgets,focus_behavior=False,lwidth=1,hover_highlight=False,ena
             pass
         kvWd=nkvWd
 
-    kel=skivify_v2(kvWd,k=k,lwidth=lwidth,enable_events=enable_events,on_event=on_event,**kwargs)
+    kel=skivify(kvWd,k=k,lwidth=lwidth,enable_events=enable_events,on_event=on_event,**kwargs)
 
     # print(kwargs)
     # kel=kvWd(**kwargs)
@@ -4650,12 +6230,12 @@ def ToggleButtonBoxit(*widgets,focus_behavior=False,hover_highlight=False,enable
         kvWd=_
 
 
-    kel=kvWd(**kwargs)
+    kel=skivify(kvWd,k=k,enable_events=enable_events,on_event=on_event,**kwargs)
 
-    kel.id=k
+    # kel.id=k
 
-    kel.enable_events=enable_events
-    kel.on_event=on_event
+    # kel.enable_events=enable_events
+    # kel.on_event=on_event
     kel.post='ToggleGeneral'
 
     for w in widgets:
@@ -4673,16 +6253,14 @@ def FlatButtonAngle(text='button',angle=90,enable_events=True,k=None,on_event='o
     kvWd=kvw.FlatButtonAngle
 
     # kvWd=kvw.add_parent(kvWd,behavior)
-
-    kel=kvWd(text=text,angle=angle,**kwargs)
-    
     if k==None and text:
         k=text
+    kel=skivify(kvWd,text=text,k=k,enable_events=enable_events,on_event=on_event,angle=angle,**kwargs)
 
-    kel.id=k
+    # kel.id=k
 
-    kel.enable_events=enable_events
-    kel.on_event=on_event
+    # kel.enable_events=enable_events
+    # kel.on_event=on_event
 
     # if enable_events:
     #     _future_bind.append(kel)
@@ -4716,15 +6294,14 @@ def FlatToggleButton(text='button',enable_events=False,k=None,on_event='on_state
             pass
         kvWd=_
 
-    kel=kvWd(text=text,**kwargs)
-    
     if k==None and text:
         k=text
+    kel=skivify(kvWd,text=text,k=k,enable_events=enable_events,on_event=on_event,**kwargs)
 
-    kel.id=k
+    # kel.id=k
 
-    kel.enable_events=enable_events
-    kel.on_event=on_event
+    # kel.enable_events=enable_events
+    # kel.on_event=on_event
     kel.post='ToggleGeneral'
     return kel
 FlatTB=FlatTButton=FlatToggleButton
@@ -4753,6 +6330,7 @@ def Spinner(# default value shown
 
     # _future_elements.append(kel)
     return kel
+@_widget_ctor
 def Spinner2(text='choice0',
     values=('choice0', 'choice1'),
     enable_events=False,k=None,on_event='text',
@@ -4853,7 +6431,7 @@ def ListBox(
             case 'scroll':
                 from kivy.effects.scroll import ScrollEffect as effect_cls
 
-    kel=skivify_v2(kvw.RV,k=k,enable_events=enable_events,effect_cls=effect_cls,on_event=on_event,data=data,keyboard_scroll=keyboard_scroll,
+    kel=skivify(kvw.RV,k=k,enable_events=enable_events,effect_cls=effect_cls,on_event=on_event,data=data,keyboard_scroll=keyboard_scroll,
         # selected_color=selected_color,
         **kwargs)
     # Clock.schedule_once(lambda dt:kel.setter('data')(kel,data))
@@ -4880,7 +6458,7 @@ def Rowlist(
                 from kivy.effects.scroll import DampedScrollEffect as effect_cls
             case 'scroll':
                 from kivy.effects.scroll import ScrollEffect as effect_cls
-    kel=skivify_v2(kvw.Rowlist,
+    kel=skivify(kvw.Rowlist,
         k=k,
 
         viewclass_cell=kvw.LabelB,
@@ -4908,7 +6486,7 @@ def Playlist(
     
 
 
-    kel=skivify_v2(kvw.Playlist,k=k,data=data,keyboard_scroll=keyboard_scroll,enable_events=enable_events,on_event=on_event,**kwargs)
+    kel=skivify(kvw.Playlist,k=k,data=data,keyboard_scroll=keyboard_scroll,enable_events=enable_events,on_event=on_event,**kwargs)
     
     # kel.id=k
 
@@ -4933,12 +6511,12 @@ def Artistlist(
     keyboard_scroll=True,
     **kwargs
     ):
-    kel=kvw.Artistlist(data=data,keyboard_scroll=keyboard_scroll,**kwargs)
+    kel=skivify(kvw.Artistlist,k=k,enable_events=enable_events,on_event=on_event,data=data,keyboard_scroll=keyboard_scroll,**kwargs)
     
-    kel.id=k
+    # kel.id=k
     kel.post='Artistlist'
-    kel.enable_events=enable_events
-    kel.on_event=on_event
+    # kel.enable_events=enable_events
+    # kel.on_event=on_event
     return kel
 
 RecycleStackList=Artistlist
@@ -4960,7 +6538,7 @@ def Albumlist(
     
 
 
-    kel=skivify_v2(kvw.Albumlist,data=data,keyboard_scroll=keyboard_scroll,enable_events=enable_events,on_event=on_event,k=k,**kwargs)
+    kel=skivify(kvw.Albumlist,data=data,keyboard_scroll=keyboard_scroll,enable_events=enable_events,on_event=on_event,k=k,**kwargs)
     
     # kel.id=k
 
@@ -4981,7 +6559,7 @@ def Albumlist(
 
 
 @skwidget
-def Input(text='',enable_events=False,multiline=False,k=None,on_event='on_text_validate', **kwargs):
+def TextInput(text='',enable_events=False,multiline=False,k=None,on_event='on_text_validate', **kwargs):
     # kwargs=_preproces(**kwargs)
     # global _future_elements, _future_bind
 
@@ -5030,11 +6608,13 @@ def Input(text='',enable_events=False,multiline=False,k=None,on_event='on_text_v
             """Event handler for when delayed text is ready"""
             pass
 
-    kel=skivify_v2(W,text=text,k=k,multiline=multiline,enable_events=enable_events,on_event=on_event,**kwargs)
+    kel=skivify(W,text=text,k=k,multiline=multiline,enable_events=enable_events,on_event=on_event,**kwargs)
     return kel
 
+Input=In=TextInput
+
 @skwidget
-def InputDark(text='',enable_events=False,multiline=False,k=None,on_event='on_text_validate', **kwargs):
+def TextInputDark(text='',enable_events=False,multiline=False,k=None,on_event='on_text_validate', **kwargs):
     W=kvw.kvInput
 
     # if 'on_insert_text' in on_event:
@@ -5056,27 +6636,29 @@ def InputDark(text='',enable_events=False,multiline=False,k=None,on_event='on_te
             self.dispatch('on_insert_text')
             return super().insert_text(s, from_undo=from_undo)
 
-    kel=skivify_v2(W,text=text,k=k,enable_events=enable_events,on_event=on_event,multiline=multiline,**kwargs)
+    kel=skivify(W,text=text,k=k,enable_events=enable_events,on_event=on_event,multiline=multiline,**kwargs)
     
     return kel
 
-@skwidget
-def Multiline(text='',enable_events=False,multiline=False,k=None,on_event='on_text_validate', **kwargs):
+InputDark=InDark=TextInputDark
+
+@_widget_ctor
+def Multiline(text='',enable_events=False,multiline=True,k=None,on_event='on_text_validate', **kwargs):
     locs=locals()
     # print(locs)
     kw=locs.pop('kwargs')
     locs.update(kw)
-    locs['multiline']=True
+    locs['multiline']=multiline
 
     return Input(**locs)
 
-@skwidget
-def MultilineDark(text='',enable_events=False,multiline=False,k=None,on_event='on_text_validate', **kwargs):
+@_widget_ctor
+def MultilineDark(text='',enable_events=False,multiline=True,k=None,on_event='on_text_validate', **kwargs):
     locs=locals()
     # print(locs)
     kw=locs.pop('kwargs')
     locs.update(kw)
-    locs['multiline']=True
+    locs['multiline']=multiline
 
     return InputDark(**locs)
 
@@ -5132,13 +6714,13 @@ def CodeInput(text='',lexer='CythonLexer',style_name='default',rehighlight=None,
 
     lexer=getattr(lexers,lexer)
     # lexer=CustomTexLexer
-    kel=nW(text=text,lexer=lexer(),style_name=style_name,**kwargs)
+    kel=skivify(nW,text=text,lexer=lexer(),style_name=style_name,k=k,enable_events=enable_events,on_event=on_event,**kwargs)
     # kel=W(text=text,lexer=CombinedLexer(),style='dracula',**kwargs)
     # kel=W(text=text,lexer=TexLexer(),style='dracula',**kwargs)
-    kel.id=k
+    # kel.id=k
 
-    kel.enable_events=enable_events
-    kel.on_event=on_event
+    # kel.enable_events=enable_events
+    # kel.on_event=on_event
 
     return kel
 
@@ -5202,15 +6784,18 @@ def TreeView(tree = {
                 for child_node in node['children']:
                     self.populate_tree_view(tree_node, child_node)
     
-    kel = skivify_v2(W,tree=tree,root_options=dict(text='Tree One'),
+    kel = skivify(W,tree=tree,root_options=dict(text='Tree One'),
                       hide_root=False,
+                      k=k,
+                      enable_events=enable_events,
+                      on_event=on_event,
                       indent_level=indent_level,**kwargs)
 
     # populate_tree_view(kel, None, tree)
-    kel.id=k
+    # kel.id=k
 
-    kel.enable_events=enable_events
-    kel.on_event=on_event
+    # kel.enable_events=enable_events
+    # kel.on_event=on_event
     return kel
 
 # TEST_WIDGET(TreeView(on_event='selected_node',enable_events=True))
@@ -5299,7 +6884,7 @@ def Popup(content,title='Popup window',enable_events=False,on_event='on_dismiss'
     from kivy.uix.popup import Popup as kvWd
 
 
-    kel=skivify_v2(kvWd,
+    kel=skivify(kvWd,
         title=title,
         content=content,
         k=k,
@@ -5434,6 +7019,10 @@ def CalcSheet(
     # on_event='text',
     **kwargs
     ):
+    '''
+    {: .prompt-warning }
+    > Experimental widget. Imagine a fusion of Excel and Python.
+    '''
     kwargs=_preproces(**kwargs)
     global _future_elements, _future_bind,_post_elements
 
@@ -5581,7 +7170,7 @@ def ScrollbarMirror(k=None,enable_events=False,on_event=None,**kwargs):
     return kel
 
 @skwidget
-def BarTouch(value=0,max=1,scroll_delta=0,k=None,enable_events=False,on_event="value",**kwargs):
+def BarTouchH(value=0,max=1,scroll_delta=0,k=None,enable_events=False,on_event="value",**kwargs):
     class kvWd(kvw.RelativeLayout):
         scroll_delta=NumericProperty(0)
         bcolor = kvw.ListProperty([50/255, 164/255, 206/255, 1])  # background color
@@ -5737,7 +7326,7 @@ def BarTouch(value=0,max=1,scroll_delta=0,k=None,enable_events=False,on_event="v
             self.line.width = value
     kel=skivify_v2(kvWd,value=value,max=max,scroll_delta=scroll_delta,k=k,enable_events=enable_events,on_event=on_event,**kwargs)
     return kel
-BarTouchH=BarTouch
+BarTouch=BarTouchH
 @skwidget
 def BarTouchV(value=0,max=1,scroll_delta=0,k=None,enable_events=False,on_event="value",**kwargs):
     class kvWd(kvw.RelativeLayout):
@@ -5910,8 +7499,12 @@ def SliderTouch(value=0,min=0,max=1,k=None,enable_events=True,on_event='on_click
 
     return kel
 
-
+@_widget_ctor
 def Void(k=NOTKEY,**kwargs):
+    '''
+    A void `Boxit` widget with `k= NOTKEY, size = (0,0), size_hint = (None, None)` as default.
+    See {url_Boxit}.
+    '''
     kel=Boxit(k=k,size=kwargs.pop('size',(0,0)),size_hint=kwargs.pop('size_hint',(None,None)))
     kel.is_void=True
     return kel
@@ -5919,10 +7512,18 @@ def PAW():
     kel=Boxit(size=(0,0),size_hint=(None,None),k=NOTKEY)
     Clock.schedule_once(lambda dt:get_kvApp().paw())
     return kel
-def Fill(size=(0,0),size_hint=(1,1),k=NOTKEY,**kwargs):
+
+@_widget_ctor
+def Fill(k=NOTKEY,**kwargs):
+    size=kwargs.pop('size',(0,0))
+    size_hint=kwargs.pop('size_hint',(1,1))
     return Boxit(size=size,size_hint=size_hint,k=k,**kwargs)
+
+@_widget_ctor
 def SeparatorV(bcolor='gray',size=(2,1),size_hint=(None,1),k=NOTKEY,**kwargs):
     return Boxit(bcolor=bcolor,size=size,size_hint=size_hint,k=k,**kwargs)
+
+@_widget_ctor
 def SeparatorH(bcolor='gray',size=(1,2),size_hint=(1,None),k=NOTKEY,**kwargs):
     return Boxit(bcolor=bcolor,size=size,size_hint=size_hint,k=k,**kwargs)
 
@@ -5962,6 +7563,59 @@ def QuickOkCancel(msg='message',title='title'):
     return app.ans
 
 class EventManager:
+    '''
+    The EventManager class is an alternative to handling SimpleKivy events.
+
+    It provides different types of decorator methods to define rules for catching events.
+    Optimized for speed in applications with a huge amount of different events.
+
+    ## Decorator Methods
+    `@EventManager.start`: Sets the callback for the `"__Start__"`) event.
+    `@EventManager.close`: Sets the callback for the `"__Close__"`) event.
+    `@EventManager.event() or @EventManager.event( event_name = str )`: Sets a callback for an **exact match** (`==`) corresponding to an event id. Accepts an `event_name` argument, which let's you set the catch rule `event == event_name`. `event_name` defaults to None, in which case the function name is used as the `event_name` value.
+    `@EventManager.rule( rule_callback = function )`: Sets a callback for any event that meets a custom rule function. Needs the positional argument `rule_callback`, which has to be a function that accepts **one** argument, and returns a value that can be converted to `bool`, for example: `True, False, None, "hello", "", 0, 1`. Rule testing is only performed once. If the `bool` conversion returns `True` by the `rule_callback`, the event is cached to immediately trigger the callback decorated with `rule` when triggering the same event id again.
+    
+    `@EventManager.unhandled`: Sets a callback for any event that is not catched by any other rule.
+    
+    Exact matches (set by the `event` decorator) are always tested first before `rule` decorator testing.
+
+    > Example:
+    
+    ```py
+    evman=sk.EventManager()
+
+    @evman.event("btn")
+    def on_btn(app,ev):
+        """Handles the "btn" event"""
+    
+    @evman.event()
+    def Exit(app,ev):
+        """Handles the "Exit" event"""
+
+    @evman.start
+    def on_start(app,ev):
+        """Handles the "__Start__" event"""
+
+    @evman.close
+    def on_start(app,ev):
+        """Handles the "__Close__" event"""
+    
+    @evman.rule(lambda x: x.startswith('http'))
+    def on_http(app,ev):
+        """"Will catch any event that starts with "http"."""
+    
+    @evman.unhandled
+    def on_other(app,ev):
+        """Handles any other events that are not caught by an exact match or rule."""
+
+    app = sk.MyApp(
+        ...
+        event_manager = evman,
+        ...
+    )
+    ```
+    
+    '''
     __events__={}
     __rules__={}
     __ev_to_rule__={}
@@ -5969,7 +7623,7 @@ class EventManager:
     def __init__(self):
         self.__events__['__Start__']=self._nofunc
         self.__events__['__Close__']=self._nofunc
-    def _nofunc(self,*l):
+    def _nofunc(self,*l,**kwargs):
         pass
     def __test_rules__(self,ev):
         try:
@@ -5977,7 +7631,10 @@ class EventManager:
         except:
             rans=None
             for ri,calli in self.__rules__.items():
-                rans=ri(ev)
+                try:
+                    rans=ri(ev)
+                except:
+                    rans=False
                 if rans:
                     self.__ev_to_rule__[ev]=calli
                     return calli
@@ -5985,7 +7642,7 @@ class EventManager:
                 self.__unhandled__.add(ev)
                 return self._
 
-    def __call__(self,app,ev):
+    def __call__(self,app,ev,*args,**kwargs):
         self.app=app
         try:
             callback=self.__events__[ev]
@@ -5994,8 +7651,14 @@ class EventManager:
                 callback=self._
             else:
                 callback=self.__test_rules__(ev)
-        callback(app,ev)
-    def _(self,app,ev):
+        
+        callback(app,ev,*args,**kwargs)
+        # try:
+        #     callback(app,ev,*args,**kwargs)
+        # except Exception as e:
+        #     traceback.print_exc()
+            # pass
+    def _(self,app,ev,*args,**kwargs):
         print('Unhandled:',ev)
         pass
     def event(self,event_name=None):
@@ -6005,34 +7668,34 @@ class EventManager:
             if event_name[0]==None:
                 event_name[0]=func.__name__
             self.__events__[event_name[0]]=func
-            def wrapper(app,ev):
-                result=func(app,ev)
+            def wrapper(app,ev,*args,**kwargs):
+                result=func(app,ev,*args,**kwargs)
                 return result
         return event_decorator
     def start(self,func):
         self.__events__['__Start__']=func
-        def wrapper(app,ev):
-            result=func(app,ev)
+        def wrapper(app,ev,*args,**kwargs):
+            result=func(app,ev,*args,**kwargs)
             return result
         return wrapper
     def close(self,func):
         fname='__Close__'
         self.__events__[fname]=func
-        def wrapper(app,ev):
-            result=func(app,ev)
+        def wrapper(app,ev,*args,**kwargs):
+            result=func(app,ev,*args,**kwargs)
             return result
         return wrapper
     def rule(self,rule_callback):
         def rule_decorator(func):
             self.__rules__[rule_callback]=func
-            def wrapper(app,ev):
-                result=func(app,ev)
+            def wrapper(app,ev,*args,**kwargs):
+                result=func(app,ev,*args,**kwargs)
                 return result
         return rule_decorator
     def unhandled(self,func):
         self._=func
-        def wrapper(app,ev):
-            result=func(app,ev)
+        def wrapper(app,ev,*args,**kwargs):
+            result=func(app,ev,*args,**kwargs)
             return result
         return wrapper
 
@@ -6249,7 +7912,7 @@ def Filelist(
 
         # lambda *x: on_box_w(label_path_box,label_path_box.width)
     # label_path.bind(texture_size=on_text)
-    path_input=InputDark()
+    path_input=InputDark(k=NOTKEY,)
     def on_pre_open(*x):
         setattr(path_input,'text',f"{label_path.path}")
         path_input.do_cursor_movement('cursor_end')
@@ -6356,16 +8019,16 @@ def Filelist(
     btn_apply_sort.bind(on_release=on_btn_apply_sort)
     input_search=InputDark(hint_text=f"Search {cdir.name}",k=NOTKEY)
     sort_menu=BoxitV(
-            Label('Name',halign='left',padding=(4,0,0,0))*\
-            LabelCheck(mdi('sort-alphabetical-ascending')+" A-Z",active=True,markup=True,group='_sortmethod',allow_no_selection=False)*\
-            LabelCheck(mdi('sort-alphabetical-descending')+" Z-A",markup=True,group='_sortmethod',allow_no_selection=False),
-            Label('Size',halign='left',padding=(4,0,0,0))*\
-            LabelCheck(mdi('sort-reverse-variant')+" Smaller",markup=True,group='_sortmethod',allow_no_selection=False)*\
-            LabelCheck(mdi('sort-variant')+" Bigger",markup=True,group='_sortmethod',allow_no_selection=False),
-            Label('Date',halign='left',padding=(4,0,0,0))*\
-            LabelCheck(mdi('sort-calendar-ascending')+" Newer",markup=True,group='_sortmethod',allow_no_selection=False)*\
-            LabelCheck(mdi('sort-calendar-descending')+" Older",markup=True,group='_sortmethod',allow_no_selection=False),
-            Label('Folders',halign='left',padding=(4,0,0,0))*ToggleButton('First',state='down',group='_folder')*ToggleButton('Last',group='_folder')*ToggleButton('Mix',group='_folder'),
+            Label('Name',halign='left',padding=(4,0,0,0),k=NOTKEY,)*\
+            LabelCheck(mdi('sort-alphabetical-ascending')+" A-Z",active=True,markup=True,group='_sortmethod',allow_no_selection=False,k=NOTKEY,)*\
+            LabelCheck(mdi('sort-alphabetical-descending')+" Z-A",markup=True,group='_sortmethod',allow_no_selection=False,k=NOTKEY,),
+            Label('Size',halign='left',padding=(4,0,0,0),k=NOTKEY,)*\
+            LabelCheck(mdi('sort-reverse-variant')+" Smaller",markup=True,group='_sortmethod',allow_no_selection=False,k=NOTKEY,)*\
+            LabelCheck(mdi('sort-variant')+" Bigger",markup=True,group='_sortmethod',allow_no_selection=False,k=NOTKEY,),
+            Label('Date',halign='left',padding=(4,0,0,0),k=NOTKEY,)*\
+            LabelCheck(mdi('sort-calendar-ascending')+" Newer",markup=True,group='_sortmethod',allow_no_selection=False,k=NOTKEY,)*\
+            LabelCheck(mdi('sort-calendar-descending')+" Older",markup=True,group='_sortmethod',allow_no_selection=False,k=NOTKEY,),
+            Label('Folders',halign='left',padding=(4,0,0,0),k=NOTKEY,)*ToggleButton('First',state='down',group='_folder',k=NOTKEY,)*ToggleButton('Last',group='_folder',k=NOTKEY,)*ToggleButton('Mix',group='_folder',k=NOTKEY,),
             input_search,
             # LabelCheck(mdi('sort-alphabetical-ascending')+" Name (A-Z)",active=True,markup=True,group='_sortmethod')*\
             # LabelCheck(mdi('sort-alphabetical-descending')+" Name (Z-A)",markup=True,group='_sortmethod'),
@@ -6378,6 +8041,7 @@ def Filelist(
             bcolor='#2C2C2C',
             spacing=4,
             padding=4,
+            k=NOTKEY,
             )
     input_search.bind(on_text_validate=lambda x:btn_apply_sort.trigger_action())
     sort_menu.sort_mode=4
@@ -6424,7 +8088,8 @@ def Filelist(
                 Void(size="x16"),
                 # input_search,
                 btn_sort,
-                size='y35'
+                size='y35',
+                k=NOTKEY,
                 )
     # print()
     icons=utils.FileIconFinder(mdi('file-question',size=25))
@@ -6489,6 +8154,7 @@ def Filelist(
                     size_hint_x=None,
                     spacing=2,
                     # size_hint_min_x=300,
+                    k=NOTKEY,
                     )
     shortcuts.base_shortcuts=shortcut_list+refresh_storage
     def shortcuts_refresh(self,*x):
@@ -6541,13 +8207,26 @@ def Filelist(
                 size_hint_x=None,
 
                 strip_size=8,
-                min_size=135
+                min_size=135,
+                k=NOTKEY,
                 )
     resize_shortcut.bind(height=lambda *x:setattr(shortcuts,'scroll_y',1))
-    bh=BoxitH()
-    filelist=Rowlist(spacing=2)
+    bh=BoxitH(k=NOTKEY,)
+    bar_width=15
+    filelist=Rowlist(spacing=2,k=NOTKEY,bar_width=bar_width)
+    rlt_box=BoxitV(
+        Fill(size=(0,bar_width),size_hint=(1,None))*FlatButton(mdi('chevron-up',size=bar_width),size=f'{bar_width}',k=NOTKEY,lcolor='',
+            on_release=lambda ins:setattr(filelist,'scroll_y',1)
+            ),
+        filelist,
+        Fill(size=(0,bar_width),size_hint=(1,None))*FlatButton(mdi('chevron-down',size=bar_width),size=f'{bar_width}',k=NOTKEY,lcolor='',
+            on_release=lambda ins:setattr(filelist,'scroll_y',0)
+            ),
+        k=NOTKEY
+        )
     bh.add_widget(resize_shortcut)
-    bh.add_widget(filelist)
+    bh.add_widget(rlt_box)
+    # bh.add_widget(filelist)
     ################################################################################
     # kel=BoxitV(
     #         top_bar,
@@ -6664,7 +8343,7 @@ def Filelist(
         di=rv.data[sel[0]]['meta']
         rv.root.on_path(di)
 
-    hist_list=ListBox(size_hint_y=None,size_hint_max_y=90,bcolor='#2C2C2C',bind=dict(on_selection=on_hist_selection))
+    hist_list=ListBox(size_hint_y=None,size_hint_max_y=90,bcolor='#2C2C2C',bind=dict(on_selection=on_hist_selection),k=NOTKEY,)
     hist_list.bind(parent=on_hist_menu_parent)
     AddMenu(
         top_bar,
@@ -6770,7 +8449,7 @@ def Filelist(
             path: Path object to check
             decimal_places: Number of decimal places to show
             
-        Returns:
+        ## Returns:
             Formatted size string with appropriate unit
         """
         size_bytes = path.stat().st_size
@@ -6787,7 +8466,7 @@ def Filelist(
             path: Path object to check
             decimal_places: Number of decimal places to show
             
-        Returns:
+        ## Returns:
             Formatted size string with appropriate unit
         """
         _stat_result=path_stat

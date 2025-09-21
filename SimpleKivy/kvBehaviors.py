@@ -6,7 +6,7 @@ from kivy.graphics import Ellipse,Color,Rectangle,Line
 # from .utils import get_kvWindow
 from . import utils
 from .utils import resolve_color
-from kivy.uix.behaviors import ButtonBehavior
+from kivy.uix.behaviors import ButtonBehavior as _ButtonBehavior
 #--------------------------------------------------------------------------------------------------------------------------------
 # hi=0
 _other_highlighted=None
@@ -1273,3 +1273,55 @@ class FocusBehavior(object):
         '''
         if self.keyboard_mode == 'managed':
             self._unbind_keyboard()
+
+
+
+
+class ButtonBehavior(_ButtonBehavior):
+    is_held = BooleanProperty(False)
+    repeat_delay = 0.5  # seconds before repeating starts
+    repeat_interval = 0.1  # seconds between repeats
+    
+    def __init__(self, **kwargs):
+        self.register_event_type('on_repeat')
+        super(ButtonBehavior, self).__init__(**kwargs)
+        self._repeat_clock = None
+        self._initial_press_fired = False
+    
+    def on_press(self):
+        self.is_held = True
+        self._initial_press_fired = False
+        
+        # Fire the first event immediately
+        self.dispatch('on_repeat')
+        self._initial_press_fired = True
+        
+        # Schedule the repeating action after a delay
+        self._repeat_clock = Clock.schedule_once(
+            self._start_repeating, 
+            self.repeat_delay
+        )
+    
+    def on_release(self):
+        self.is_held = False
+        if self._repeat_clock:
+            Clock.unschedule(self._repeat_clock)
+            self._repeat_clock = None
+        Clock.unschedule(self._repeated_action)
+    
+    def _start_repeating(self, dt):
+        if self.is_held:
+            # Start repeating at the specified interval
+            self._repeat_clock = Clock.schedule_interval(
+                self._repeated_action, 
+                self.repeat_interval
+            )
+    
+    def _repeated_action(self, dt):
+        if self.is_held:
+            self.dispatch('on_repeat')
+        else:
+            Clock.unschedule(self._repeated_action)
+    
+    def on_repeat(self):
+        pass

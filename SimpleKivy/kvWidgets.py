@@ -101,7 +101,8 @@ from kivy.uix.boxlayout import BoxLayout
 from kivy.uix.stacklayout import StackLayout
 from kivy.uix.floatlayout import FloatLayout
 from kivy.uix.relativelayout import RelativeLayout
-from kivy.uix.behaviors import ButtonBehavior, ToggleButtonBehavior, TouchRippleButtonBehavior,TouchRippleBehavior
+from kivy.uix.behaviors import ToggleButtonBehavior, TouchRippleButtonBehavior,TouchRippleBehavior#, ButtonBehavior
+from .kvBehaviors import ButtonBehavior
 
 from kivy.graphics import Ellipse,Color,Rectangle,Line,RoundedRectangle,SmoothRoundedRectangle,SmoothLine
 
@@ -152,13 +153,66 @@ class Button(kvButton):
     # def _set_background_color_down(self,ins,bcolor_normal):
     #     r,g,b,a=bcolor_normal
     #     self.bcolor_down=[r,g,b,1]
-    def __init__(self,**kwargs):
-        # self.bind(bcolor_normal=self.setter('background_color'))
-        # self.bind(bcolor_normal=self._set_background_color_down)
+    
+    #------------------------------------------------------------------------
+    # def __init__(self,**kwargs):
+    #     # self.bind(bcolor_normal=self.setter('background_color'))
+    #     # self.bind(bcolor_normal=self._set_background_color_down)
+    #     self.bind(bcolor=self.setter('background_color'))
+    #     super(Button,self).__init__(**kwargs)
+    #     # self.bcolor_normal
+    #     self.bcolor=self.bcolor_normal
+
+    #------------------------------------------------------------------------
+    is_held = BooleanProperty(False)
+    repeat_delay = 0.5  # seconds before repeating starts
+    repeat_interval = 0.1  # seconds between repeats
+    
+    def __init__(self, **kwargs):
         self.bind(bcolor=self.setter('background_color'))
-        super(Button,self).__init__(**kwargs)
-        # self.bcolor_normal
+        self.register_event_type('on_repeat')
+        super(kvButton, self).__init__(**kwargs)
+        self._repeat_clock = None
+        self._initial_press_fired = False
         self.bcolor=self.bcolor_normal
+    
+    def on_press(self):
+        self.is_held = True
+        self._initial_press_fired = False
+        
+        # Fire the first event immediately
+        self.dispatch('on_repeat')
+        self._initial_press_fired = True
+        
+        # Schedule the repeating action after a delay
+        self._repeat_clock = Clock.schedule_once(
+            self._start_repeating, 
+            self.repeat_delay
+        )
+    
+    def on_release(self):
+        self.is_held = False
+        if self._repeat_clock:
+            Clock.unschedule(self._repeat_clock)
+            self._repeat_clock = None
+        Clock.unschedule(self._repeated_action)
+    
+    def _start_repeating(self, dt):
+        if self.is_held:
+            # Start repeating at the specified interval
+            self._repeat_clock = Clock.schedule_interval(
+                self._repeated_action, 
+                self.repeat_interval
+            )
+    
+    def _repeated_action(self, dt):
+        if self.is_held:
+            self.dispatch('on_repeat')
+        else:
+            Clock.unschedule(self._repeated_action)
+    
+    def on_repeat(self):
+        pass
 
         
     
@@ -593,7 +647,8 @@ class BoxLayoutB(BgLine,BoxLayout):
     pass
 
 class RoundBgLineState(object):
-    r=NumericProperty(8)
+    # r=NumericProperty(8)
+    r=VariableListProperty((8,8,8,8),length=4)
     segments=NumericProperty(30)
     lwidth=NumericProperty(1)
 
@@ -663,13 +718,15 @@ class RoundBgLineState(object):
         # self.bind(size=lambda obj, size: setattr(self.bg_rect, "size", size))
         # Clock.schedule_once(self._create)
     # def _create(self,dt):
+        # print(self.r)
         with self.canvas.before:
             self.bg_color=Color(rgba=self.bcolor)
             self.bg_rect = SmoothRoundedRectangle(
                 # pos=self.pos,
                 size=self.size,
                 pos_hint=pos_hints.center,
-                radius=[(self.r, self.r)]*4,
+                # radius=[(self.r, self.r)]*4,
+                radius=self.r,
                 segments=self.segments,
             )
         with self.canvas.after:
@@ -678,9 +735,15 @@ class RoundBgLineState(object):
                 size=self.size,
                 width=self.lwidth,
                 pos_hint=pos_hints.center,
+                # rounded_rectangle=(
+                #     self.x, self.y, self.width, self.height, self.r, self.r, self.r, self.r, self.segments
+                # ),
                 rounded_rectangle=(
-                self.x, self.y, self.width, self.height, self.r, self.r, self.r, self.r, self.segments
-                )
+                    self.x, self.y, self.width, self.height, 
+                    # self.r, self.r, self.r, self.r,
+                    *self.r,
+                    self.segments
+                ),
                 )
 
         # Bind properties to update visuals
@@ -708,7 +771,10 @@ class RoundBgLineState(object):
                 # 1
                 # 0,0,0,100,100,100,100,0,
                 # 10
-                self.x, self.y, self.width, self.height, self.r, self.r, self.r, self.r, self.segments
+                self.x, self.y, self.width, self.height, 
+                # self.r, self.r, self.r, self.r, 
+                *self.r,
+                self.segments
 
                 )
         # self.text_size = self.size
@@ -732,7 +798,8 @@ class RoundBgLineState(object):
     
 
 class RoundBgLine(object):
-    r=NumericProperty(8)
+    # r=NumericProperty(8)
+    r=VariableListProperty((8,8,8,8),length=4)
     segments=NumericProperty(30)
     lwidth=NumericProperty(1)
 
@@ -793,7 +860,8 @@ class RoundBgLine(object):
                 # pos=self.pos,
                 size=self.size,
                 pos_hint=pos_hints.center,
-                radius=[(self.r, self.r)]*4,
+                # radius=[(self.r, self.r)]*4,
+                radius=self.r,
                 segments=self.segments,
             )
         with self.canvas.after:
@@ -803,7 +871,10 @@ class RoundBgLine(object):
                 width=self.lwidth,
                 pos_hint=pos_hints.center,
                 rounded_rectangle=(
-                self.x, self.y, self.width, self.height, self.r, self.r, self.r, self.r, self.segments
+                self.x, self.y, self.width, self.height,
+                # self.r, self.r, self.r, self.r,
+                *self.r,
+                self.segments
                 )
                 )
         
@@ -831,7 +902,10 @@ class RoundBgLine(object):
                 # 1
                 # 0,0,0,100,100,100,100,0,
                 # 10
-                self.x, self.y, self.width, self.height, self.r, self.r, self.r, self.r, self.segments
+                self.x, self.y, self.width, self.height,
+                # self.r, self.r, self.r, self.r,
+                *self.r,
+                self.segments
 
                 )
         # self.text_size = self.size
@@ -3008,8 +3082,9 @@ class FlatRoundButtonA(RoundBLayout):
 
     def __init__(self,**kwargs):
         # print(kwargs)
-        super(FlatRoundButtonA,self).__init__(**kwargs)
         self._label=_Label(size_hint=(1,1))
+        super(FlatRoundButtonA,self).__init__(**kwargs)
+        
 
         self.add_widget(self._label)
         _setter_task=dict(
