@@ -1179,7 +1179,50 @@ class _MiniApp:
 
 class MyApp(App):
     '''
-    A complete overhaul of how the `App` object is created.
+    A complete overhaul of how the `App` object is created. For simplicity, in this page `app` represents an instance of `MyApp` inside code blocks.
+
+    ## Init Arguments
+    `title (str)`: App title. Defaults to `"MyApp"`.
+
+    `layout (list)`: List (or matrix-like list) of widgets that represent your program. When `layout_class = None`, a *matrix-like* list must be used (see {url_Grid}). Otherwise, the `list` argument must conform to the `layout_class` constructor. Defaults to `[[]]`.
+    
+    `event_manager`: `function` or `EventManager` instance. Must accept at least two positional arguments: `app` and `event`.
+    
+    ```py
+    def evman(app, event):
+        pass
+    app=sk.MyApp(
+        ...
+        event_manager = evman
+        ...
+    )
+    ```
+
+    `custom_titlebar (bool)`: Whether the `app` will use the first widget in the `layout` as titlebar. Defaults to `False`
+    
+    `alpha (float)`: Transparency of the window. Only works on Windows at the moment. Defaults to `1` (opaque).
+
+    `keep_on_top (bool)`: Wheter your application's window is shown on top of all other windows. Defaults to `False`.
+    
+    `icon (str)`: Image of your application's icon. Defaults to "skdata/logo/simplekivy-icon-32.png".
+
+    `ico (str)`: Path to an `*.ico` file. Needed for file dialogs (`askdirectory`, `askopenfile`, etc.) in Windows platforms only.
+    
+    `layout_class: (None, Widget)`
+    > Layuout widget that will be used to represent the layout.
+    > - `None`: The layout base will be `SimpleKivy.kvWidgets.GridLayoutB`, in which case the `layout` argument must be `list (matrix-like)`. See {url_Grid}.
+    > - `Widget`: The layout constructor will be this value. The `layout` argument must conform to the requirements of `layout_class`.
+    > Default is `None`.
+
+    `layout_args (dict)`: Dictionary of arguments used to initilize the `layout_class` (e.g, *bcolor*, *padding*, *spacing*, *lcolor*, etc.). Defaults to `{}`.
+    
+    `do_auto_config: (bool)`
+    > Whether to automatically configure `kivy` by calling `SimpleKivy.utils.auto_config` when `WIDGET` is initialized. Visit {url_utils.auto_config} for more information.
+    > - `True`: Calls `auto_config` with default arguments: `(size=(800,600),exit_on_escape=False,multisamples=2,desktop=True,resizable=True,multitouch_emulation=False,window_state='visible')`.
+    > -  `False`: Doesn't call `auto_config`. You need to configure `kivy` yourself, or make a call to `auto_config` before initializing `MyApp`.
+    > Default is `True`.
+
+
 
     ## Attributes
     
@@ -1201,7 +1244,7 @@ class MyApp(App):
     
     `ids (IDS)`: Dictionary of ids of all app widgets. You can access widgets with *variable name conformant* ids with dot notation (`app.ids.widget_id`) if the widget was created like this: `sk.Label("text",k='widget_id')`.
 
-    `event_manager`: `function` or `EventManager` instance. Must accept at least two positional arguments `app` and `event`.
+    `event_manager`: `function` or `EventManager` instance. Must accept at least two positional arguments: `app` and `event`.
     
     ```py
     def evman(app, event):
@@ -1213,7 +1256,7 @@ class MyApp(App):
     )
     ```
 
-    `ico (str)`: Path to an `*.ico` file. Needed for file dialogs (`askdirectory`, `askopenfile`, etc.) in in Windows platforms only.
+    `ico (str)`: Path to an `*.ico` file. Needed for file dialogs (`askdirectory`, `askopenfile`, etc.) in Windows platforms only.
 
     `poolt`: Initialized as `ThreadPoolExecutor(thread_name_prefix='SimpleKivy')`.  You can use it to submit threaded tasks.
 
@@ -1221,7 +1264,8 @@ class MyApp(App):
 
     ## Methods
 
-    `process_added_widgets()`: Call this after creating `SimpleKivy` widgets. Finishes processing widgets and incorporating them to the `MyApp` instance.
+    `process_added_widgets()`: Call this after creating new `SimpleKivy` widgets when your program is already running (e.g., adding `Popup` widgets, menus, buttons, etc.). Finishes processing widgets and incorporating them into the `app`.
+    > Aliases: `paw`
 
     `thread_pool_new(name, max_workers=None)`: Creates a thread pool with `ThreadPoolExecutor(max_workers=max_workers,thread_name_prefix=name)` and adds it to the `queue` dictionary with the name as key.
 
@@ -1238,13 +1282,13 @@ class MyApp(App):
     `destroy_widget(k, default = None)`: Removes a widget from the extra references kept by `SimpleKivy`, like `app.ids`.
     
     `add_top_widget(widget, remove_on_click=True)`: Adds a top widget to be shown on top of other widgets.
-    > - `widget (Widget)`: Widget (sets as `MyApp.top_widget` value).
+    > - `widget (Widget)`: Widget (sets as `app.top_widget` value).
     > - `remove_on_click (bool)`: Whether the `top_widget` will be removed automatically when a mouse click event is detected.
 
     `remove_top_widget()`: Remove the current `top_widget` if any.
     
     `add_top_widget(widget, remove_on_click=True)`: Adds a subtop widget to be shown on top of other widgets, besides the `top_widget`.
-    > - `widget (Widget)`: Widget (sets as `MyApp.subtop_widget` value).
+    > - `widget (Widget)`: Widget (sets as `app.subtop_widget` value).
     > - `remove_on_click (bool)`: Whether the `subtop_widget` will be removed automatically when a mouse click event is detected.
 
     `remove_subtop_widget()`: Remove the current `subtop_widget` if any.
@@ -1264,18 +1308,19 @@ class MyApp(App):
 
     `bring_to_front()`: Brings the Window to the front of all other opened programs.
 
-    `__call__(k,prop=None,val=None,timeout=0,_kw_prepro=False,ignore_errors=False,**kwargs)`: You can call a `MyApp` instance as if it were a function to schedule property changes.
+    `__call__(k,prop=None,val=None,timeout=0,_kw_prepro=False,ignore_errors=False,**kwargs)`: You can call the `app` as if it were a function to schedule property changes (`app(...)`). 
+    > - `k (str, Widget)`: The Value of the `k` argument represents a widget, either by its *widget id*, or by the `Widget` instance itself. 
 
     > Example:
     ```py
     app(k='label_widget_id',text='New text', haling='right')
     ```
 
-    `dt_call(k,prop=None,val=None,_kw_prepro=False,ignore_errors=False,**kwargs)`: Returns a `lambda` function that calls `MyApp.__call__` with the given arguments.
+    `dt_call(k,prop=None,val=None,_kw_prepro=False,ignore_errors=False,**kwargs)`: Returns a `lambda` function that calls `app.__call__` (same as `app(...)`) with the given arguments.
 
-    `schedule_call_once(k,prop=None,val=None,timeout=0,_kw_prepro=False,ignore_errors=False,**kwargs)`: Schedules `MyApp.__call__` with the given arguments to be called in the next frame.
+    `schedule_call_once(k,prop=None,val=None,timeout=0,_kw_prepro=False,ignore_errors=False,**kwargs)`: Schedules `app(...)` with the given arguments to be called in the next frame.
 
-    `schedule_call_interval(k,prop=None,val=None,timeout=0,_kw_prepro=False,ignore_errors=False,**kwargs)`: Schedules `MyApp.__call__` with the given arguments to be called every `timeout` seconds.
+    `schedule_call_interval(k,prop=None,val=None,timeout=0,_kw_prepro=False,ignore_errors=False,**kwargs)`: Schedules `app(...)` with the given arguments to be called every `timeout` seconds.
     
     `trigger_event(event,*args,**kwargs)`: Gets or creates a trigger for the event. The trigger created will call the `event_manager` with the given arguments.
 
@@ -1285,15 +1330,17 @@ class MyApp(App):
 
     `schedule_get_call(key,method,*args,**kwargs)`: Schedule once a call to the method named `method` of a widget with ID `key`, and with the given arguments `*args` and `**kwargs`.
 
-    `submit_thread_event(event,*args,**kwargs)`: Submits a call of the `event_manager` in the `poolt` thread pool with the given arguments. Aliases: `thread_event`
+    `submit_thread_event(event,*args,**kwargs)`: Submits a call of the `event_manager` in the `poolt` thread pool with the given arguments. 
+    > Aliases: `thread_event`
 
-    `submit_thread_event_at(thread_name,event,*args,**kwargs)`: Submits a call of the `event_manager` in the `queue[thread_name]` thread pool with the given arguments. Aliases: `thread_event_at`
+    `submit_thread_event_at(thread_name,event,*args,**kwargs)`: Submits a call of the `event_manager` in the `queue[thread_name]` thread pool with the given arguments.
+    > Aliases: `thread_event_at`
 
     `call_event(event,*args,**kwargs)`: Calls the `event_manager` with the given arguments.
 
-    `keys()`: Shortcut to `MyApp.ids.keys()`.
-    `values()`: Shortcut to `MyApp.ids.values()`.
-    `items()`: Shortcut to `MyApp.ids.items()`.
+    `keys()`: Shortcut to `app.ids.keys()`.
+    `values()`: Shortcut to `app.ids.values()`.
+    `items()`: Shortcut to `app.ids.items()`.
 
     `AskOpenFile(initialdir: str, filetypes: tuple or list, callback: function or None, **kw)`: Creates a `SimpleKivy` file dialog to open a file.
     {initialdir}
@@ -1374,9 +1421,9 @@ class MyApp(App):
         custom_titlebar=False,
         alpha=1,
         keep_on_top=False,
-        layout_args={},
         icon='skdata/logo/simplekivy-icon-32.png',
         layout_class=None,
+        layout_args={},
         do_auto_config=True,
         **kwargs
         ):
@@ -1543,8 +1590,8 @@ class MyApp(App):
         self._hwnd=None
         
         # self.Clock.schedule_once(lambda dt: setattr(self.icon,'ico',))
-        if icon=='skdata/logo/simplekivy-icon-32.png':
-            self.ico=resource_find('skdata/logo/simplekivy-icon-256.ico')
+        # if icon=='skdata/logo/simplekivy-icon-32.png':
+        self.ico=resource_find(kwargs.pop('ico','skdata/logo/simplekivy-icon-256.ico'))
         # self.Clock.schedule_once(lambda dt: setattr(self.icon,'ico',))
         # self.icon=icon
         # Clock.schedule_once(lambda dt: setattr(self,'icon',icon),1)
@@ -4138,6 +4185,9 @@ def Boxit(*widgets,k=None,base_cls=None,**kwargs):
         kel.add_widget(w)
     # _future_elements.append(kel)
     return kel
+
+
+
 @skwidget
 def Splitter(widget=None,k=None,sizable_from = 'right',**kwargs):
     from kivy.uix.splitter import Splitter as kvWd
@@ -4181,6 +4231,167 @@ def BoxitH(*widgets,k=None,orientation='horizontal',**kwargs):
     
     setattr(kel,'_isbox',kel.orientation)
     # _future_elements.append(kel)
+    return kel
+
+@skwidget
+def Frame(title='Frame',*widgets,k=None,orientation='horizontal',
+    label_args={},
+    **kwargs):
+    '''
+    Dynamic `WIDGET` constructor.
+
+    ## Parameters
+
+    {}
+    
+    {widgets}
+
+    {common}
+
+    {bgline}
+
+    ## Returns
+    
+    `Widget` created dynamically with `*widgets` added as children during creation.
+
+    ## Kivy Bases
+    
+    `RelativeLayout, BoxLayout, Label`
+
+    {base_params}
+    '''
+
+    # kwargs=_preproces(**kwargs)
+    lcolor=kwargs.pop('lcolor',[.5,.5,.5,1])
+    lwidth=kwargs.pop('lwidth',1)
+    class kvWd(kvw.RelativeLayout):
+        lcolor=kvw.ColorProperty([.5,.5,.5,1])
+        lwidth=kvw.NumericProperty(1)
+
+        label_args=kvw.ObjectProperty({})
+
+        def __init__(self, **kwargs):
+            # kwargs['bcolor']=resolve_color(kwargs.get('bcolor',self.bcolor))
+            # kwargs['lcolor']=resolve_color(kwargs.get('lcolor',self.lcolor))
+            print(self.lcolor)
+            super(kvWd, self).__init__(**kwargs)
+
+            Clock.schedule_once(self._init)
+
+        def _update_label_args(self,instance,value):
+            for k,v in value.items():
+                setattr(self.lbl,k,v)
+
+        def _update_lcolor(self, instance, value):
+            """Update line color"""
+            # self.line_color.rgba = resolve_color( value)
+            self.line_color.rgba = value
+    
+        def _update_lwidth(self, instance, value):
+            """Update line width"""
+            self.line.width = value
+
+        def _update_canvas(self, *args):
+            self.box.size_hint=(None,None)
+            self.box.width=self.width-self.lbl.height
+            self.box.height=self.height-self.lbl.height-self.lbl.height/2
+            self.box.x=self.lbl.height/2
+            self.box.y=self.lbl.height/2
+            # self.box.pos=self.to_parent(self.lbl.height/2,self.lbl.height/2)
+
+            self.line.points=[
+                    *self.to_parent(self.lbl.x+self.lbl.width, self.height-self.lbl.height/2),
+                    *self.to_parent(self.width, self.height-self.lbl.height/2),
+                    *self.to_parent(self.width, 0),
+                    *self.to_parent(0, 0),
+                    *self.to_parent(0, self.height-self.lbl.height/2),
+                    *self.to_parent(self.lbl.x, self.height-self.lbl.height/2),
+                    ]
+        def _init(self,dt):
+            self.box.size_hint=(None,None)
+            self.box.width=self.width-self.lbl.height
+            self.box.height=self.height-self.lbl.height-self.lbl.height/2
+            self.box.x=self.lbl.height/2
+            self.box.y=self.lbl.height/2
+
+            with self.canvas.after:
+                self.line_color=kvw.Color(rgba=self.lcolor)
+                self.line=kvw.Line(points=[
+                    *self.to_parent(self.lbl.x+self.lbl.width, self.height-self.lbl.height/2),
+                    *self.to_parent(self.width, self.height-self.lbl.height/2),
+                    *self.to_parent(self.width, 0),
+                    *self.to_parent(0, 0),
+                    *self.to_parent(0, self.height-self.lbl.height/2),
+                    *self.to_parent(self.lbl.x, self.height-self.lbl.height/2),
+                    ],
+                    joint='miter',
+                    cap='square',
+                    width=1)
+            # lcolor=self._update_lcolor,
+            self.bind(
+                lcolor=self._update_lcolor,
+                lwidth=self._update_lwidth,
+                label_args=self._update_label_args,
+            )
+
+
+    kel=skivify_v2(kvWd,k=k,lcolor=lcolor)
+
+    default_lbl_args=dict(size='y22',size_behavior='texth',padding=[6,0,6,0],pos_hint={'top':1},x=15)
+    default_lbl_args.update(label_args)
+
+    kel.lbl=Label(title,k=NOTKEY,**default_lbl_args)
+    kel.box=BoxitH(*widgets,k=NOTKEY,orientation=orientation,
+        # padding=[kel.lbl.height/2,0,kel.lbl.height/2,kel.lbl.height/2],
+        **kwargs)
+    kel.add_widget(kel.lbl)
+    kel.add_widget(kel.box)
+    
+    
+
+    # def _init(self,dt):
+    #     self.box.size_hint=(None,None)
+    #     self.box.width=self.width
+    #     self.box.height=self.height-self.lbl.height
+    #     # self.box.pos=self.to_parent(15,15)
+
+    #     with self.canvas.after:
+    #         self.line_color=kvw.Color(rgba=self.lcolor)
+    #         self.line=kvw.Line(points=[
+    #             *self.to_parent(self.lbl.x+self.lbl.width, self.height-self.lbl.height/2),
+    #             *self.to_parent(self.width, self.height-self.lbl.height/2),
+    #             *self.to_parent(self.width, 0),
+    #             *self.to_parent(0, 0),
+    #             *self.to_parent(0, self.height-self.lbl.height/2),
+    #             *self.to_parent(self.lbl.x, self.height-self.lbl.height/2),
+    #             ],
+    #             width=1)
+    #     # lcolor=self._update_lcolor,
+    #     self.bind(lcolor=self._update_lcolor,
+    #         lwidth=self._update_lwidth
+    #     )
+
+    # kel._init=types.MethodType(_init,kel)
+    # Clock.schedule_once(kel._init) 
+    # kel._init(0)       
+    # kel._update_canvas=types.MethodType(_update_canvas,kel)
+    # kel.add_widget=types.MethodType(kel.box.add_widget,kel)
+    kel.add_widget=kel.box.add_widget
+    kel.remove_widget=kel.box.remove_widget
+    
+    kel.bind(
+            pos=kel._update_canvas,
+            size=kel._update_canvas,
+            # bcolor=self._update_bcolor,
+            # lcolor=self._update_lcolor,
+            # lwidth=self._update_lwidth
+        )
+    kel.lbl.bind(
+        pos=kel._update_canvas,
+        size=kel._update_canvas
+        )
+
+
     return kel
 
 @skwidget
@@ -7583,7 +7794,7 @@ class EventManager:
     `@EventManager.event() or @EventManager.event( event_name = str )`: Sets a callback for an **exact match** (`==`) corresponding to an event id. Accepts an `event_name` argument, which let's you set the catch rule `event == event_name`. `event_name` defaults to None, in which case the function name is used as the `event_name` value.
     `@EventManager.rule( rule_callback = function )`: Sets a callback for any event that meets a custom rule function. Needs the positional argument `rule_callback`, which has to be a function that accepts **one** argument, and returns a value that can be converted to `bool`, for example: `True, False, None, "hello", "", 0, 1`. Rule testing is only performed once. If the `bool` conversion returns `True` by the `rule_callback`, the event is cached to immediately trigger the callback decorated with `rule` when triggering the same event id again.
     
-    `@EventManager.unhandled`: Sets a callback for any event that is not catched by any other rule.
+    `@EventManager.unhandled`: Sets a callback for any event that is not caught by any other rule.
     
     Exact matches (set by the `event` decorator) are always tested first before `rule` decorator testing.
 
