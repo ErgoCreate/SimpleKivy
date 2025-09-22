@@ -1088,6 +1088,8 @@ class _MiniApp:
 
     def schedule_call_once(self,k,prop=None,val=None,timeout=0,_kw_prepro=False,ignore_errors=False,**kwargs):
         Clock.schedule_once(lambda dt:self.__call__(k=k,prop=prop,val=val,_kw_prepro=_kw_prepro,ignore_errors=ignore_errors,**kwargs),timeout=timeout)
+    def schedule_call_interval(self,k,prop=None,val=None,timeout=0,_kw_prepro=False,ignore_errors=False,**kwargs):
+        Clock.schedule_interval(lambda dt:self.__call__(k=k,prop=prop,val=val,_kw_prepro=_kw_prepro,ignore_errors=ignore_errors,**kwargs),timeout=timeout)
 
     def __call__(self,k,prop=None,val=None,timeout=0,_kw_prepro=False,ignore_errors=False,**kwargs):
         try:
@@ -1262,22 +1264,26 @@ class MyApp(App):
 
     `bring_to_front()`: Brings the Window to the front of all other opened programs.
 
-    `dt_call(k,prop=None,val=None,_kw_prepro=False,ignore_errors=False,**kwargs)`: Returns a `lambda` function that calls `MyApp.__call__` with the given arguments.
-
-    `schedule_call_once(k,prop=None,val=None,timeout=0,_kw_prepro=False,ignore_errors=False,**kwargs)`: Schedules `MyApp.__call__` with the given arguments to be called in the next frame.
-
     `__call__(k,prop=None,val=None,timeout=0,_kw_prepro=False,ignore_errors=False,**kwargs)`: You can call a `MyApp` instance as if it were a function to schedule property changes.
 
     > Example:
     ```py
     app(k='label_widget_id',text='New text', haling='right')
     ```
+
+    `dt_call(k,prop=None,val=None,_kw_prepro=False,ignore_errors=False,**kwargs)`: Returns a `lambda` function that calls `MyApp.__call__` with the given arguments.
+
+    `schedule_call_once(k,prop=None,val=None,timeout=0,_kw_prepro=False,ignore_errors=False,**kwargs)`: Schedules `MyApp.__call__` with the given arguments to be called in the next frame.
+
+    `schedule_call_interval(k,prop=None,val=None,timeout=0,_kw_prepro=False,ignore_errors=False,**kwargs)`: Schedules `MyApp.__call__` with the given arguments to be called every `timeout` seconds.
     
     `trigger_event(event,*args,**kwargs)`: Gets or creates a trigger for the event. The trigger created will call the `event_manager` with the given arguments.
 
     `schedule_event_once(event,*args,timeout=0,**kwargs)`: Schedule a call of the `event_manager` for the next frame with the given arguments.
 
     `schedule_func_once(func,*args,timeout=0,**kwargs)`: Schedule a function to be called in the next frame with the given arguments.
+
+    `schedule_get_call(key,method,*args,**kwargs)`: Schedule once a call to the method named `method` of a widget with ID `key`, and with the given arguments `*args` and `**kwargs`.
 
     `submit_thread_event(event,*args,**kwargs)`: Submits a call of the `event_manager` in the `poolt` thread pool with the given arguments. Aliases: `thread_event`
 
@@ -2027,6 +2033,8 @@ class MyApp(App):
 
     def schedule_call_once(self,k,prop=None,val=None,timeout=0,_kw_prepro=False,ignore_errors=False,**kwargs):
         Clock.schedule_once(lambda dt:self.__call__(k=k,prop=prop,val=val,_kw_prepro=_kw_prepro,ignore_errors=ignore_errors,**kwargs),timeout=timeout)
+    def schedule_call_interval(self,k,prop=None,val=None,timeout=0,_kw_prepro=False,ignore_errors=False,**kwargs):
+        Clock.schedule_interval(lambda dt:self.__call__(k=k,prop=prop,val=val,_kw_prepro=_kw_prepro,ignore_errors=ignore_errors,**kwargs),timeout=timeout)
     # def unschedule_call(self,k,prop=None,val=None,_kw_prepro=False,ignore_errors=False,**kwargs):
     #     Clock.unschedule(lambda dt:self.__call__(k=k,prop=prop,val=val,_kw_prepro=_kw_prepro,ignore_errors=ignore_errors,**kwargs))
 
