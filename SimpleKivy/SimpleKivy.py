@@ -681,6 +681,19 @@ def locked_screen(func):
         # result=func(*args,**kwargs)
         # return future.result()
         return future
+    def args_preprocessor(*args, **kwargs):
+        kel = f(*args, **kwargs)
+        return kel
+    f=func
+    wrap=wrapper
+    wrap.__doc__ = f.__doc__
+    wrap.__name__ = f.__name__
+    wrap.__module__ = f.__module__
+    wrap.__qualname__ = f.__qualname__
+    wrap.__annotations__ = getattr(f, '__annotations__', {})
+    wrap.__signature__ = signature(f)
+    wrap.__widget_ctor__=f.__name__
+
     return wrapper
 
 def skwidget(f):
@@ -1293,7 +1306,9 @@ class MyApp(App):
 
     `remove_subtop_widget()`: Remove the current `subtop_widget` if any.
 
-    `infotip`: Shows an infotip.
+    {method_infotip}
+    > Shows an infotip.
+    
     `infotip_schedule`: Schedules an infotip to be shown in the next frame.
 
     `infotip_remove_schedule`: Schedules the `top_widget` to be removed in the next frame.
@@ -1342,39 +1357,23 @@ class MyApp(App):
     `values()`: Shortcut to `app.ids.values()`.
     `items()`: Shortcut to `app.ids.items()`.
 
-    `AskOpenFile(initialdir: str, filetypes: tuple or list, callback: function or None, **kw)`: Creates a `SimpleKivy` file dialog to open a file.
-    {initialdir}
-    {filetypes}
-    {filedialog_callback}
-    {filedialog_kw}
+    {method_AskOpenFile}
+    > Creates a `SimpleKivy` file dialog to open a file.
 
-    `AskDirectory`: Creates a `SimpleKivy` file dialog to open a directory.
-    {initialdir}
-    {filedialog_callback}
-    {filedialog_kw}
+    {method_AskDirectory}
+    > Creates a `SimpleKivy` file dialog to open a directory.
 
-    `askdirectory`: Creates a native platform file dialog to open a directory.
-    {initialdir}
-    {filedialog_callback}
-    {filedialog_kw}
+    {method_askdirectory}
+    > Creates a native platform file dialog to open a directory.
 
-    `askopenfile`: Creates a native platform file dialog to open a file.
-    {initialdir}
-    {filetypes}
-    {filedialog_callback}
-    {filedialog_kw}
+    {method_askopenfile}
+    > Creates a native platform file dialog to open a file.
 
-    `askopenfiles`: Creates a native platform file dialog to open multiple files.
-    {initialdir}
-    {filetypes}
-    {filedialog_callback}
-    {filedialog_kw}
+    {method_askopenfiles}
+    > Creates a native platform file dialog to open multiple files.
 
-    `asksaveasfile`: Creates a native platform file dialog to save a file as the input name and location.
-    {initialfile}
-    {filetypes}
-    {filedialog_callback}
-    {filedialog_kw}
+    {method_asksaveasfile}
+    > Creates a native platform file dialog to save a file as the input name and location.
     
     `popup_message`: Creates a popup widget with a message.
 
@@ -2134,6 +2133,14 @@ class MyApp(App):
         callback=None,
             **kw,
         ):
+        '''
+        Creates a `SimpleKivy` file dialog to open a file.
+
+        {initialdir}
+        {filetypes}
+        {filedialog_callback}
+        {filedialog_kw}
+        '''
         _k='askopenfile'
         if _k in self._filebrowser:
             self._filebrowser[_k].root.filelist.filelist.deselect_all()
@@ -2340,12 +2347,12 @@ class MyApp(App):
         **kw,
         ):
         '''
-        title - the title of the window
-        initialdir - the directory that the dialog starts in
-        initialfile - the file selected upon opening of the dialog
-        filetypes - a sequence of (label, pattern) tuples, ‘*’ wildcard is allowed
-        defaultextension - default extension to append to file (save dialogs)
-        multiple - when true, selection of multiple items is allowed
+        Creates a native platform file dialog to open a file.
+
+        {initialdir}
+        {filetypes}
+        {filedialog_callback}
+        {filedialog_kw}
         '''
         import tkinter as tk
         root=tk.Tk()
@@ -2367,6 +2374,12 @@ class MyApp(App):
         callback=None,
             **kw,
         ):
+        '''
+        Creates a `SimpleKivy` file dialog to open a directory.
+        {initialdir}
+        {filedialog_callback}
+        {filedialog_kw}
+        '''
         _k='askdirectory'
         if _k in self._filebrowser:
             self._filebrowser[_k].root.filelist.filelist.deselect_all()
@@ -2468,9 +2481,11 @@ class MyApp(App):
         **kw,
         ):
         '''
-        title - the title of the window
-        initialdir - the directory that the dialog starts in
-        multiple - when true, selection of multiple items is allowed
+        Creates a native platform file dialog to open a directory.
+        
+        {initialdir}
+        {filedialog_callback}
+        {filedialog_kw}
         '''
         import tkinter as tk
         root=tk.Tk()
@@ -2499,12 +2514,12 @@ class MyApp(App):
         **kw,
         ):
         '''
-        title - the title of the window
-        initialdir - the directory that the dialog starts in
-        initialfile - the file selected upon opening of the dialog
-        filetypes - a sequence of (label, pattern) tuples, ‘*’ wildcard is allowed
-        defaultextension - default extension to append to file (save dialogs)
-        multiple - when true, selection of multiple items is allowed
+        Creates a native platform file dialog to save a file as the input name and location.
+        
+        {initialfile}
+        {filetypes}
+        {filedialog_callback}
+        {filedialog_kw}
         '''
 
 
@@ -2536,12 +2551,12 @@ class MyApp(App):
         **kw,
         ):
         '''
-        title - the title of the window
-        initialdir - the directory that the dialog starts in
-        initialfile - the file selected upon opening of the dialog
-        filetypes - a sequence of (label, pattern) tuples, ‘*’ wildcard is allowed
-        defaultextension - default extension to append to file (save dialogs)
-        multiple - when true, selection of multiple items is allowed
+        Creates a native platform file dialog to open multiple files.
+        
+        {initialdir}
+        {filetypes}
+        {filedialog_callback}
+        {filedialog_kw}
         '''
 
         # def _do():
@@ -3897,7 +3912,9 @@ def ComboBox(text='choice0',
 
     ## Kivy Bases
     
-    `BoxLayout, TextInput, Button`
+    - `BoxLayout`
+        - `TextInput`
+        - `Button`
 
     {base_params}
     '''
@@ -4234,7 +4251,7 @@ def BoxitH(*widgets,k=None,orientation='horizontal',**kwargs):
     return kel
 
 @skwidget
-def Frame(title='Frame',*widgets,k=None,orientation='horizontal',
+def Frame(title='Frame',*widgets,k=None,orientation='vertical',
     label_args={},
     **kwargs):
     '''
@@ -4242,21 +4259,30 @@ def Frame(title='Frame',*widgets,k=None,orientation='horizontal',
 
     ## Parameters
 
-    {}
+    `title (str)`: Frame title, must be the first argument.
     
     {widgets}
 
     {common}
 
-    {bgline}
+    {line}
+
+    - `lcolor`: Defaults to `[.5,.5,.5,1]`.
+    - `lwidth`: Defaults to `1`.
+
+    `orientation (OptionProperty)`: Inner BoxLayout orientation. Must be one of `("horizontal", "vertical")`. Defaults to `"vertical"`.
+
+    `label_args (dict)`: Properties of the title `Label`. See {url_Label}. Defaults to `{}`. `label_args` Updates the default properties: `dict(size='y22',size_behavior='texth',padding=[6,0,6,0],pos_hint={'top':1},x=15)`.
 
     ## Returns
     
-    `Widget` created dynamically with `*widgets` added as children during creation.
+    `WIDGET` created dynamically with `*widgets` added as children during creation.
 
     ## Kivy Bases
     
-    `RelativeLayout, BoxLayout, Label`
+    - `RelativeLayout`
+        - `Label`
+        - `BoxLayout`
 
     {base_params}
     '''
@@ -4419,7 +4445,9 @@ def LabelCheck(text='checkbox',halign='left',valign='middle',enable_events=False
 
     ## Kivy Bases
     
-    `BoxLayout, Label, CheckBox`
+    - `BoxLayout`
+        - `Label`
+        - `CheckBox`
 
     {base_params}
     '''
@@ -4604,8 +4632,10 @@ def WebView(url="https://www.google.com",k=None,
     
     # from . import webview
     from .webview_enhance import enhance
-    import sk_webview as webview
-    # import webview
+    try:
+        import sk_webview as webview
+    except:
+        import webview
     from kivy.uix.behaviors import FocusBehavior
     import threading
     class kvWd(kvb.HoverBehavior,FocusBehavior,kvw.BoxLayoutB):
@@ -6178,7 +6208,8 @@ def FlatButton(text='flat_button',
 
     ## Kivy Bases
     
-    `BoxLayout, Label`
+    - `BoxLayout`
+        - `Label`
 
     {base_params}
     
@@ -6300,7 +6331,8 @@ def FlatRoundButton(text='flat_round_btn',
 
     ## Kivy Bases
     
-    `RelativeLayout, Label`
+    - `RelativeLayout`
+        - `Label`
 
     {base_params}
     
@@ -6359,7 +6391,7 @@ def ClearRoundButton(text='clear_round_btn',hover_highlight=True,lcolor='gray',m
     '''
     {inits_FlatRoundButton}
     '''
-    return FlatRoundButton(*args,hover_highlight=hover_highlight,lcolor=lcolor,markup=markup,**kwargs)
+    return FlatRoundButton(text=text,hover_highlight=hover_highlight,lcolor=lcolor,markup=markup,**kwargs)
 
 ClearRoundB=ClearRoundButton
 

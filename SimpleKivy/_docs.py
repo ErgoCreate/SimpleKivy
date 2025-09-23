@@ -85,6 +85,11 @@ tbd_widfun='''
 > The documentation of this widget creator function is under construction. Please come back at a latter date.
 '''
 
+tbd_method='''
+{: .prompt-info }
+> The documentation of this method is under construction. Please come back at a latter date.
+'''
+
 base_params='''
 {: .prompt-info }
 > This page only details the new or modified features. All other parameters inherit from the base Kivy widgets and can be found in the [official Kivy documentation](https://kivy.org/doc/stable).
@@ -94,9 +99,21 @@ bgline='''
 `bcolor, lcolor` and any other valid properties with ***color*** in their name can be specified with `sequence or str` during creation:
 > - `sequence: [float, float, float, float]`: Sequence `(list or tuple)` of 4 `float` numbers (0.0-1.0). Same as `Kivy`.
 > - `str: "{hex_string}"`: Hex color in the format `"#000000"`.
-> - `str: "{named_color}"`: Name of a color from the [list of named colors](/posts/named_colors) supported by `SimpleKivy`.
+> - `str: "{named_color}"`: Name of a color from the [List of Named Colors](/posts/named_colors) supported by `SimpleKivy`.
 
 >> `bcolor`: Background color of the widget.
+
+>> `lcolor`: Line color of the widget.
+
+`lwidth: number (float or int)`
+> Width of the widget's border line.
+'''
+
+line='''
+`lcolor` and any other valid properties with ***color*** in their name can be specified with `sequence or str` during creation:
+> - `sequence: [float, float, float, float]`: Sequence `(list or tuple)` of 4 `float` numbers (0.0-1.0). Same as `Kivy`.
+> - `str: "{hex_string}"`: Hex color in the format `"#000000"`.
+> - `str: "{named_color}"`: Name of a color from the [List of Named Colors](/posts/named_colors) supported by `SimpleKivy`.
 
 >> `lcolor`: Line color of the widget.
 
@@ -108,7 +125,7 @@ bgline_state='''
 `bcolor_normal, bcolor_down, bcolor, lcolor` and any other valid properties with ***color*** in their name can be specified with `sequence or str` during creation:
 > - `sequence: [float, float, float, float]`: Sequence `(list or tuple)` of 4 `float` numbers (0.0-1.0). Same as `Kivy`.
 > - `str: "{hex_string}"`: Hex color in the format `"#000000"`.
-> - `str: "{named_color}"`: Name of a color from the [list of named colors](/posts/named_colors) supported by `SimpleKivy`.
+> - `str: "{named_color}"`: Name of a color from the [List of Named Colors](/posts/named_colors) supported by `SimpleKivy`.
 
 >> `bcolor_normal`: Background color of the widget when `state="normal"`.
 
@@ -126,7 +143,7 @@ bg_state='''
 `bcolor_normal, bcolor_down, bcolor` and any other valid properties with ***color*** in their name can be specified with `sequence or str` during creation:
 > - `sequence: [float, float, float, float]`: Sequence `(list or tuple)` of 4 `float` numbers (0.0-1.0). Same as `Kivy`.
 > - `str: "{hex_string}"`: Hex color in the format `"#000000"`.
-> - `str: "{named_color}"`: Name of a color from the [list of named colors](/posts/named_colors) supported by `SimpleKivy`.
+> - `str: "{named_color}"`: Name of a color from the [List of Named Colors](/posts/named_colors) supported by `SimpleKivy`.
 
 >> `bcolor_normal`: Background color of the widget when `state="normal"`.
 
@@ -208,7 +225,7 @@ rounded='''
 '''
 
 initialdir='''
-> - `initialdir`: Initial directory. Defaults to "./".
+> - `initialdir`: Initial directory. Defaults to `"./"`.
 '''
 
 initialfile='''
