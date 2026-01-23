@@ -685,6 +685,8 @@ class BgLineState(object):
 
 class BoxLayoutB(BgLine,BoxLayout):
     pass
+class BoxLayoutBState(BgLineState,BoxLayout):
+    pass
 
 class RoundBgLineState(object):
     # r=NumericProperty(8)
@@ -3556,7 +3558,7 @@ class SelectableRecycleBoxLayout(LayoutSelectionBehavior,
     ''' Adds selection and focus behavior to the view. '''
 
 
-class Pl_Selectable(RecycleDataViewBehavior, BoxLayoutB):
+class Pl_Selectable(RecycleDataViewBehavior, BoxLayoutBState):
     ''' Add selection support to the Label '''
     index = None
     selected = BooleanProperty(False)
@@ -3896,7 +3898,7 @@ Builder.load_string('''
 #     ''' Adds selection and focus behavior to the view. '''
 
 
-class Al_Selectable(RecycleDataViewBehavior, BoxLayoutB):
+class Al_Selectable(RecycleDataViewBehavior, BoxLayoutBState):
     ''' Add selection support to the Label '''
     index = None
     selected = BooleanProperty(False)

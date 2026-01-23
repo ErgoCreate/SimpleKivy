@@ -57,7 +57,7 @@ pip install git+https://github.com/ErgoCreate/SimpleKivy.git
 ### Optional modules
 The *Image* widget has new *copy/paste/save* functionalities introduced in **SimpleKivy** that require the following modules to work as expected:
 ``` bash
-pip install pyperclipimg, requests, pillow
+pip install pyperclipimg requests pillow
 ``` 
 
 
