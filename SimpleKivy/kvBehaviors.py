@@ -1,12 +1,15 @@
 from kivy.clock import Clock
-from .utils import Colors
-from kivy.properties import BooleanProperty,NumericProperty,StringProperty,ListProperty,ObjectProperty
+# from .utils import Colors
+from .kvProperties import ColorProperty
+from kivy.properties import BooleanProperty,NumericProperty,StringProperty,ListProperty,ObjectProperty,VariableListProperty
 from kivy.graphics import Ellipse,Color,Rectangle,Line
-
+import math
 # from .utils import get_kvWindow
 from . import utils
 from .utils import resolve_color
 from kivy.uix.behaviors import ButtonBehavior as _ButtonBehavior
+from kivy.uix.behaviors import ToggleButtonBehavior as _ToggleButtonBehavior
+from kivy.uix.recycleview.views import RecycleDataViewBehavior
 #--------------------------------------------------------------------------------------------------------------------------------
 # hi=0
 _other_highlighted=None
@@ -14,9 +17,9 @@ _other_highlighted_pos=(-1,-1)
 class HoverHighlightBehavior(object):
     hovered = BooleanProperty(False)
     border_point= ObjectProperty(None)
-    bcolor_normal = ListProperty([0, 0, 0, 0])
-    bcolor_down = ListProperty([.2, .64, .8, 1])
-    bcolor = ListProperty([0, 0, 0, 0])
+    bcolor_normal = ColorProperty([0, 0, 0, 0])
+    bcolor_down = ColorProperty([.2, .64, .8, 1])
+    bcolor = ColorProperty([0, 0, 0, 0])
     tooltip_text=StringProperty('')
     tooltip_args=ObjectProperty({})
     _higlight_color=[1,1,1,1]
@@ -30,6 +33,7 @@ class HoverHighlightBehavior(object):
         self.register_event_type('on_leave')
         to_parent=kwargs.pop('to_parent',False)
         self.bcolor_normal=kwargs.get('bcolor_normal',kwargs.get('bcolor',self.bcolor_normal))
+        # print(self,self.bcolor_normal)
         self.kvWindow.bind(mouse_pos=self.on_mouse_pos_parent)
         # if to_parent:
         #     self.kvWindow.bind(mouse_pos=self.on_mouse_pos_parent)
@@ -123,6 +127,7 @@ class HoverHighlightBehavior(object):
     def on_enter(self):
         # self.bcolor=self.bcolor_down[:3]+[self.bcolor_down[-1]/2]
         # print('entering:',self)
+
         if self.do_highlight:
             self.bcolor=self._higlight_color
         
@@ -139,9 +144,10 @@ class HoverHighlightBehavior(object):
             _other_highlighted_pos=(-1,-1)
             # Clock.schedule_once(lambda dt:setattr(HoverHighlightBehavior,'_other_highlighted',None))
 
+        # print(getattr(self,'selected_color',self.bcolor_normal),self.do_highlight,getattr(self,'selected',False),hasattr(self,'selected_color'))
         if self.do_highlight:
             if getattr(self,'selected',False):
-                self.bcolor=getattr(self,'selected_color',self.bcolor_normal)
+                self.bcolor=getattr(self,'selected_color',self.bcolor_down)
             else:
                 self.bcolor=self.bcolor_normal
 
@@ -253,12 +259,29 @@ class HoverBehavior(object):
         #     _other_highlighted_pos=(-1,-1)
 
 
-from kivy.uix.behaviors import ToggleButtonBehavior
+# class ToggleButtonBehavior(_ToggleButtonBehavior):
+#     def __init__(self,**kwargs):
+#         self.register_event_type('on_state_down')
+#         super().__init__(**kwargs)
+#     def on_state(self,instance, value):
+#         if value == 'down':
+#             # self.bcolor=self.bcolor_down
+#             self.dispatch('on_state_down',self,value)
+#             # if self.group!=None:
+#             #     for w in self.get_widgets(self.group):
+#             #         if w==self:
+#             #             continue
+#             #         setattr(w,'state','normal')
+
+#         # else:
+#         #     self.bcolor=self.bcolor_normal
+#         super().on_state_down(self,instance,value)
+#     def on_state_down(self,instance, value):
+#         pass
 
 
 
-
-class ToggleButtonBehavior2(ToggleButtonBehavior):
+class ToggleButtonBehavior2(_ToggleButtonBehavior):
 
     def __init__(self,**kwargs):
         self.register_event_type('on_option')
@@ -293,16 +316,16 @@ class ToggleButtonBehavior2(ToggleButtonBehavior):
 
 
 
-class GridNavigationBehavior(ToggleButtonBehavior,object):
+class GridNavigationBehavior(_ToggleButtonBehavior,object):
     last_index=NumericProperty(None)
     selected=ObjectProperty(None)
     soft_selected=ObjectProperty(None)
     navigable=True
     # _prev_colors={}
 
-    color_soft=ListProperty([0.31, 160/255, 76/255, .3])  # line color
-    color_sel=ListProperty([0.31, 160/255, 76/255, 1])  # line color
-    _lcolor = ListProperty([1, 0, 0, 0])  # line color
+    color_soft=ColorProperty([0.31, 160/255, 76/255, .3])  # line color
+    color_sel=ColorProperty([0.31, 160/255, 76/255, 1])  # line color
+    _lcolor = ColorProperty([1, 0, 0, 0])  # line color
     _lwidth = NumericProperty(2)          # line width
     # _line=None
 
@@ -755,6 +778,14 @@ class FocusBehavior(object):
     _keyboard = ObjectProperty(None, allownone=True)
     _keyboards = {}
 
+    last_focused=None
+    gave_focus=None
+
+    _modifiers={'ctrl','shift', 'alt', 'meta', 'super', 'compose'}
+    _modifiers_but_shift={'ctrl','alt', 'meta', 'super', 'compose'}
+
+    focus_map=ObjectProperty({})
+
     ignored_touch = []
     '''A list of touches that should not be used to defocus. After on_touch_up,
     every touch that is not in :attr:`ignored_touch` will defocus all the
@@ -1034,20 +1065,41 @@ class FocusBehavior(object):
     is `'multi'` or `'systemandmulti'`, otherwise it defaults to `True`.
     '''
 
-    focus_color=ListProperty(Colors['r'])
-
+    # focus_color=ColorProperty(Colors['r'])
+    focus_color=ColorProperty([.2, .64, .8, 1])
+    focus_action=ObjectProperty(None)
+    disable_fallback_nav=BooleanProperty(False)
+    last_key_pressed=None
     def __init__(self, **kwargs):
+        self.kvWindow=utils.Window
+        self.register_event_type('on_key_released')
+        self.register_event_type('on_key_pressed')
         self._old_focus_next = None
         self._old_focus_previous = None
+        focus=kwargs.pop('focus',False)
+        # focus_map=kwargs.pop('focus_map',{})
+        if focus:
+            FocusBehavior.last_focused=self
+            # if FocusBehavior.last_focused!=self:
+            #     setattr(self,'gave_focus',FocusBehavior.last_focused)
+            #     FocusBehavior.last_focused=self
+
         super(FocusBehavior, self).__init__(**kwargs)
+        Clock.schedule_once(lambda dt:setattr(self,'focus',focus))
+
+        # Clock.schedule_once(lambda dt:setattr(self,'focus_map',focus_map))
 
         self._keyboard_mode = _keyboard_mode
         fbind = self.fbind
         fbind('focus', self._on_focus)
+        fbind('focus_map', self._on_focus_map)
         fbind('disabled', self._on_focusable)
         fbind('is_focusable', self._on_focusable)
         fbind('focus_next', self._set_on_focus_next)
         fbind('focus_previous', self._set_on_focus_previous)
+
+        # self.focus_map=focus_map
+        self._on_focus_map(self,self.focus_map)
 
     def _on_focusable(self, instance, value):
         if self.disabled or not self.is_focusable:
@@ -1055,19 +1107,42 @@ class FocusBehavior(object):
     def on_parent(self,widget,parent):
         self._lastcolor=getattr(self,'lcolor',None)
 
-    def _on_focus(self, instance, value, *largs):
-        
+    def on_focus(self,ins,value):
         if value:
-            self.lcolor=self.focus_color
+            # print('gave_focus:',utils.get_id(self.gave_focus))
+            pass
+        else:
+            if FocusBehavior.last_focused!=self:
+                setattr(self,'gave_focus',FocusBehavior.last_focused)
+                FocusBehavior.last_focused=self
+
+    def _on_focus(self, instance, value, *largs):
+        # isl=getattr(self,'index_selected',[])
+        # if isl:
+        #     inode=isl[-1]
+        #     self.children[0].goto_view(inode)
+
+        if value:
+            # print('focused:',utils.get_id(self))
+            if self.focus_color!=None:
+                self.lcolor=self.focus_color
 
         else:
             self.lcolor=getattr(self,'_lastcolor',None)
+            # if FocusBehavior.last_focused!=self:
+            #     # setattr(self,'gave_focus',FocusBehavior.last_focused)
+            #     FocusBehavior.last_focused=self
+                
+                
 
         if self.keyboard_mode == 'auto':
             if value:
                 self._bind_keyboard()
             else:
                 self._unbind_keyboard()
+
+        if self.focus_action:
+            self.focus_action(self,value)
 
     def _ensure_keyboard(self):
         if self._keyboard is None:
@@ -1098,6 +1173,7 @@ class FocusBehavior(object):
         keyboard.bind(on_key_down=self.keyboard_on_key_down,
                       on_key_up=self.keyboard_on_key_up,
                       on_textinput=self.keyboard_on_textinput)
+        self.kvWindow.bind(on_key_up=self.on_key_up)
 
     def _unbind_keyboard(self):
         keyboard = self._keyboard
@@ -1105,6 +1181,7 @@ class FocusBehavior(object):
             keyboard.unbind(on_key_down=self.keyboard_on_key_down,
                             on_key_up=self.keyboard_on_key_up,
                             on_textinput=self.keyboard_on_textinput)
+            self.kvWindow.unbind(on_key_up=self.on_key_up)
             if self._requested_keyboard:
                 keyboard.release()
                 self._keyboard = None
@@ -1188,6 +1265,56 @@ class FocusBehavior(object):
         '''
         return self._get_focus_next('focus_previous')
 
+    # def _keys_in_focus_map(self,k,mod):
+
+    #     return False
+    def _on_focus_map(self,ins,val):
+        # print(val.keys())
+        self._focus_map=dict()
+        val_expand={}
+        for k,v in val.items():
+            if k and isinstance(k,tuple):
+                if not k:
+                    raise ValueError(f'Empty or invalid "keybind" value "{k}"')
+                if len(k)==1:
+                    self._focus_map[k[0]]=v
+                    continue
+                elif len(k)>1:
+                    self._focus_map[frozenset(k)]=v
+                    continue
+            if ',' in k:
+                for kpart in k.split(','):
+                    val_expand[kpart.strip()]=v
+                continue
+            val_expand[k]=v
+        for k,v in val_expand.items():
+            if '+' in k:
+                self._focus_map[frozenset(k.split('+'))]=v
+            else:
+                self._focus_map[k]=v
+
+    # def _getitem_from_focus_map(self,k1,mod)
+    def _pressed_as_fs_key(self,k1,mod):
+        if mod:
+            fs=frozenset({k1,*mod})
+            # return fs
+        else:
+            # return k1
+            fs=k1
+        self.last_key_pressed=fs
+        
+        self.dispatch('on_key_pressed',self,self.last_key_pressed)
+        # print(f"{self.last_key_pressed=}")
+        print('PRESSED:',f"{fs = }",'@',utils.get_id(self))
+        return fs
+
+    def emulate_key_down(self,key,text=None,modifiers=[]):
+        pass
+        # (275, 'right') None []
+        # print(keycode,text,modifiers)
+        keycode=[utils.KeyBinder.keycodes.get(key,0),key]
+        self.keyboard_on_key_down(None,keycode=keycode,text=text,modifiers=modifiers)
+
     def keyboard_on_key_down(self, window, keycode, text, modifiers):
         '''The method bound to the keyboard when the instance has focus.
 
@@ -1203,42 +1330,127 @@ class FocusBehavior(object):
         Similar to other keyboard functions, it should return True if the
         key was consumed.
         '''
-        if keycode[1] == 'tab':  # deal with cycle
-            modifiers = set(modifiers)
-            if {'ctrl', 'alt', 'meta', 'super', 'compose'} & modifiers:
-                return False
-            if 'shift' in modifiers:
-                next = self.get_focus_previous()
+        # print(keycode,text,modifiers)
+        # print(window, keycode, text, modifiers)
+        if not keycode[1]:
+            keycode=keycode[0],utils.KeyBinder.sedocyek.get(keycode[0],'')
+        fs_pressed=self._pressed_as_fs_key(keycode[1],modifiers)
+
+        if fs_pressed in self._focus_map:
+        # if keycode[1] in self.focus_map:
+            # modifiers = set(modifiers)
+            # if self._modifiers & modifiers:
+            #     return False
+            next=self._focus_map.get(fs_pressed,None)
+            if next:
+                if next=='self':
+                    next=self
+                if next=='last_focused':
+                    next=FocusBehavior.last_focused
+                    if next and self!=next:
+                        self.focus = False
+
+                        next.focus = True
+
+                        return True
+                    else:
+                        return False
+                if isinstance(next,(tuple,list)):
+                    if len(next)==3:
+                        next0=next[0]
+                        cond=next[1]
+                        next1=next[2]
+                        if next0=='self':
+                            next0=self
+                        if next0=='last_focused':
+                            next0=FocusBehavior.last_focused
+
+                        if cond(self,utils.get_id(next0)):
+                            next=next0
+                        else:
+                            next=next1
+                    elif len(next)==2:
+                        next0=next[0]
+                        cond=next[1]
+                        if next0=='self':
+                            next0=self
+                        if next0=='last_focused':
+                            next0=FocusBehavior.last_focused
+
+                        cond(self,utils.get_id(next0))
+                        next=next0
+
+                if hasattr(next,'__call__'):
+                    next=next(self)
+                    if next in {False,None}:
+                        next=self
+
+
+
+                if isinstance(next,str):
+                    if next=='self':
+                        next=self
+                    else:
+                        next=utils.get_kvApp().ids[next]
+                
+                if self!=next:
+                    self.focus = False
+
+                    next.focus = True
+
+                    return True
+                else:
+                    return False
+
+        else:
+            if keycode[1] in ('spacebar','enter'):
+                modifiers = set(modifiers)
+                if self._modifiers & modifiers:
+                    return False
+                if hasattr(self,'trigger_action'):
+                    self.trigger_action()
             else:
-                next = self.get_focus_next()
-            if next:
-                self.focus = False
+                if not self.disable_fallback_nav:
 
-                next.focus = True
+                    if keycode[1] == 'tab':  # deal with cycle
+                        modifiers = set(modifiers)
+                        if self._modifiers_but_shift & modifiers:
+                            return False
+                        if 'shift' in modifiers:
+                            next = self.get_focus_previous()
+                        else:
+                            next = self.get_focus_next()
+                        if next:
+                            self.focus = False
 
-            return True
-        elif keycode[1] in ('right','down'):  # deal with cycle
-            modifiers = set(modifiers)
-            if {'ctrl','shift', 'alt', 'meta', 'super', 'compose'} & modifiers:
-                return False
-            next = self.get_focus_next()
-            if next:
-                self.focus = False
+                            next.focus = True
 
-                next.focus = True
+                        return True
+                    elif keycode[1] in ('right','down'):  # deal with cycle
+                        modifiers = set(modifiers)
+                        if self._modifiers & modifiers:
+                            return False
+                        next = self.get_focus_next()
+                        if next:
+                            self.focus = False
 
-            return True
-        elif keycode[1] in ('left','up'):  # deal with cycle
-            modifiers = set(modifiers)
-            if {'ctrl','shift', 'alt', 'meta', 'super', 'compose'} & modifiers:
-                return False
-            next = self.get_focus_previous()
-            if next:
-                self.focus = False
+                            next.focus = True
 
-                next.focus = True
+                        return True
+                    elif keycode[1] in ('left','up'):  # deal with cycle
+                        modifiers = set(modifiers)
+                        if self._modifiers & modifiers:
+                            return False
+                        next = self.get_focus_previous()
+                        if next:
+                            self.focus = False
 
-            return True
+                            next.focus = True
+
+                        return True
+
+            
+
         return False
 
     def keyboard_on_key_up(self, window, keycode):
@@ -1255,10 +1467,31 @@ class FocusBehavior(object):
 
         See :meth:`keyboard_on_key_down`
         '''
+        # print(self,window,keycode)
         if keycode[1] == 'escape':
-            self.focus = False
-            return True
+            if keycode[1] in self._focus_map:
+                pass
+            else:
+                self.focus = False
+
+                # self.last_key_up=keycode[1]
+                # self.dispatch('on_key_up',keycode[1])
+
+                return True
+        
+        # self.last_key_up=keycode[1]
+        # self.dispatch('on_key_up',keycode[1])
         return False
+
+    def on_key_up(self,*largs):
+        self.dispatch('on_key_released',self,self.last_key_pressed)
+    def on_key_released(self,ins,key):
+        # print(ins,key)
+        pass
+    def on_key_pressed(self,ins,key):
+        # print(ins,key)
+        pass
+
 
     def show_keyboard(self):
         '''
@@ -1287,6 +1520,7 @@ class ButtonBehavior(_ButtonBehavior):
         super(ButtonBehavior, self).__init__(**kwargs)
         self._repeat_clock = None
         self._initial_press_fired = False
+        # print(f"{self.padding=}")
     
     def on_press(self):
         self.is_held = True
@@ -1324,4 +1558,655 @@ class ButtonBehavior(_ButtonBehavior):
             Clock.unschedule(self._repeated_action)
     
     def on_repeat(self):
+        pass
+
+class RecycleFocusBehavior(FocusBehavior):
+    def __init__(self, **kwargs):
+        super(RecycleFocusBehavior, self).__init__(**kwargs)
+    def trigger_action(self):
+        if self.index_selected:
+            self.dispatch('on_double_click',self.index_selected[-1])
+        else:
+            self.select(0)
+
+    # def __select(self,index):
+    #     # print('hell',index)
+    #     # print(self.children[0].scroll_count)
+    #     # print(self.children[0].children[0].last_node)
+    #     # print(self.layout_manager.children)
+    #     # for c in self.layout_manager.children:
+    #     if self.layout_manager.children:
+    #         self.scroll_into_view(index)
+    #         # i_o=[x.index for x in self.layout_manager.children]
+    #         # print(f"{self.layout_manager.children[0].height=}")
+    #         # ni,no=min(i_o),max(i_o)
+    #         # print(f"{ni} <= {index} <= {no}")
+    #         # self.scroll_within(ni,index,no)
+            
+    #         # elif ni==index or no==index:
+    #         #     self.scroll_into_view(index)
+    #         # if hasattr(c,'data'):
+    #         #     print(c.data[1]['text'])
+    #         # elif hasattr(c,'title'):
+    #         #     print(c.title)
+    #     self.select(index)
+
+    def scroll_within(self,min_index,index,max_index):
+        ni=min_index
+        no=max_index
+        ld=len(self.data)
+        dh=self.layout_manager.default_size[1]
+        if ld>1:
+            if dh*ld>self.height:
+                # dx=1/(ld-2)
+                dx=round(1/(ld),3)
+                if not ni <= index <= no:
+                    di=index-ni
+                    do=no-index
+                    if di>=do:
+                        sign=-1
+                        ds=abs(do)
+                        ny=1-index*dx
+                    else:
+                        sign=1
+                        ds=abs(di)
+                        ny=index*dx
+                    
+                    # print(f"{ni}<{index}{no}, {sign=}, {ds=}, {dx=}")
+                    # self.scroll_y=ny
+                    self.scroll_y=self.scroll_y+sign*ds*dx
+                    # Clock.schedule_once(lambda dt:setattr(self,'scroll_y',self.scroll_y+sign*ds*dx))
+                elif index==ni:
+                    ny=self.scroll_y+dx
+                    self.scroll_y=ny if ny<=1 else 1
+                    # Clock.schedule_once(lambda dt:setattr(self,'scroll_y',ny if ny<=1 else 1))
+                elif index==no:
+                    ny=self.scroll_y-dx
+                    self.scroll_y=ny if ny>=0 else 0
+                    # Clock.schedule_once(lambda dt:setattr(self,'scroll_y',ny if ny>=0 else 0))
+
+    #     i_o=[x.index for x in self.layout_manager.children]
+    #     ni,no=min(i_o),max(i_o)
+    #     ds=0
+    #     if ni <= index <= no:
+    #         pass
+    #     else:
+    #         print(self.scroll_y)
+
+    def keyboard_on_key_down(self, window, keycode, text, modifiers):
+        '''The method bound to the keyboard when the instance has focus.
+
+        When the instance becomes focused, this method is bound to the
+        keyboard and will be called for every input press. The parameters are
+        the same as :meth:`kivy.core.window.WindowBase.on_key_down`.
+
+        When overwriting the method in the derived widget, super should be
+        called to enable tab cycling. If the derived widget wishes to use tab
+        for its own purposes, it can call super after it has processed the
+        character (if it does not wish to consume the tab).
+
+        Similar to other keyboard functions, it should return True if the
+        key was consumed.
+        '''
+        # print(keycode,modifiers)
+        # fs_pressed=self._pressed_as_fs_key(keycode[1],modifiers)
+        if not keycode[1]:
+            keycode=keycode[0],utils.KeyBinder.sedocyek.get(keycode[0],'')
+        fs_pressed=self._pressed_as_fs_key(keycode[1],modifiers)
+        # print(f"{fs_pressed = }")
+        if fs_pressed in self._focus_map:
+            # print('isin')
+        # if keycode[1] in self.focus_map:
+            # modifiers = set(modifiers)
+            # if self._modifiers & modifiers:
+            #     return False
+            next=self._focus_map.get(fs_pressed,None)
+            if next:
+                if next=='self':
+                    next=self
+                if next=='last_focused':
+                    next=FocusBehavior.last_focused
+                    if next and self!=next:
+                        self.focus = False
+
+                        next.focus = True
+
+                        return True
+                    else:
+                        return False
+                if isinstance(next,(tuple,list)):
+                    if len(next)==3:
+                        next0=next[0]
+                        cond=next[1]
+                        next1=next[2]
+                        if next0=='self':
+                            next0=self
+                        if next0=='last_focused':
+                            next0=FocusBehavior.last_focused
+
+                        if cond(self,utils.get_id(next0)):
+                            next=next0
+                        else:
+                            next=next1
+                    elif len(next)==2:
+                        # print('len2')
+                        next0=next[0]
+                        cond=next[1]
+                        if next0=='self':
+                            next0=self
+                        if next0=='last_focused':
+                            next0=FocusBehavior.last_focused
+                        # print('doing_cb')
+                        cond(self,utils.get_id(next0))
+                        # print('done_cb')
+                        next=next0
+
+                if hasattr(next,'__call__'):
+                    next=next(self)
+                    if next in {False,None}:
+                        next=self
+
+
+
+                if isinstance(next,str):
+                    if next=='self':
+                        next=self
+                    else:
+                        next=utils.get_kvApp().ids[next]
+                
+                if self!=next:
+                    self.focus = False
+
+                    next.focus = True
+
+                    return True
+                else:
+                    return False
+
+        else:
+            if keycode[1] in ('spacebar','enter'):
+                modifiers = set(modifiers)
+                if self._modifiers & modifiers:
+                    return False
+                # print(self.index_selected)
+                if hasattr(self,'trigger_action'):
+                    self.trigger_action()
+            else:
+                if not self.disable_fallback_nav:
+
+                    if keycode[1] == 'tab':  # deal with cycle
+                        modifiers = set(modifiers)
+                        if self._modifiers_but_shift & modifiers:
+                            return False
+                        if 'shift' in modifiers:
+                            next = self.get_focus_previous()
+                        else:
+                            next = self.get_focus_next()
+                        if next:
+                            self.focus = False
+
+                            next.focus = True
+
+                        return True
+                    elif keycode[1] in ('down'):  # deal with cycle
+                        modifiers = set(modifiers)
+                        if self._modifiers & modifiers:
+                            return False
+                        # print('do-down')
+                        if self.index_selected:
+                            lasti=self.index_selected[-1]
+                            # ni=lasti+1
+                            
+                            nni=lasti
+                            while True:
+                                nni=nni+1
+                                if nni>=len(self.data):
+                                    nni=nni-len(self.data)
+                                if self.data[nni].get("selectable",True):
+                                    break
+                            ni=nni
+
+                            # if ni>=len(self.data):
+                            #     ni=ni-len(self.data)
+                            self.select(ni)
+                        else:
+                            self.select(0)
+                            # print('doing')
+                            # ndata=self.data.copy()
+                            # ndata[lasti+1]['bcolor']=self.focus_color
+                            # self.data=ndata
+                            # print('done')
+                            # print(self.index_selected)
+                        # next = self.get_focus_next()
+                        # if next:
+                        #     self.focus = False
+
+                        #     next.focus = True
+
+                        # return True
+                    elif keycode[1] in ('up'):  # deal with cycle
+                        modifiers = set(modifiers)
+                        if self._modifiers & modifiers:
+                            return False
+                        # print('do-up')
+                        if self.index_selected:
+                            lasti=self.index_selected[-1]
+                            # ni=lasti-1
+
+                            nni=lasti
+                            while True:
+                                nni=nni-1
+                                if nni<0:
+                                    nni=len(self.data)-1
+                                if nni<len(self.data):
+                                    pass
+                                else:
+                                    nni=0
+                                if self.data[nni].get("selectable",True):
+                                    break
+                            ni=nni
+
+
+                            # if ni<0:
+                            #     ni=len(self.data)-1
+                            # if ni<len(self.data):
+                            #     self.select(ni)
+                            # else:
+                            #     self.select(0)
+
+                            self.select(ni)
+                        else:
+                            self.select(0)
+                        # next = self.get_focus_previous()
+                        # if next:
+                        #     self.focus = False
+
+                        #     next.focus = True
+
+                        # return True
+
+            
+
+        return False
+
+
+class RecycleGridFocusBehavior(RecycleFocusBehavior):
+    def keyboard_on_key_down(self, window, keycode, text, modifiers):
+        '''The method bound to the keyboard when the instance has focus.
+
+        When the instance becomes focused, this method is bound to the
+        keyboard and will be called for every input press. The parameters are
+        the same as :meth:`kivy.core.window.WindowBase.on_key_down`.
+
+        When overwriting the method in the derived widget, super should be
+        called to enable tab cycling. If the derived widget wishes to use tab
+        for its own purposes, it can call super after it has processed the
+        character (if it does not wish to consume the tab).
+
+        Similar to other keyboard functions, it should return True if the
+        key was consumed.
+        '''
+        # print(keycode,text,modifiers)
+        # fs_pressed=self._pressed_as_fs_key(keycode[1],modifiers)
+        if not keycode[1]:
+            keycode=keycode[0],utils.KeyBinder.sedocyek.get(keycode[0],'')
+        fs_pressed=self._pressed_as_fs_key(keycode[1],modifiers)
+        if fs_pressed in self._focus_map:
+        # if keycode[1] in self.focus_map:
+            # modifiers = set(modifiers)
+            # if self._modifiers & modifiers:
+            #     return False
+
+            if fs_pressed in ('left','right','up','down'):
+                if fs_pressed=='down':  # deal with cycle
+                    # print('do-down')
+                    if self.index_selected:
+                        lasti=self.index_selected[-1]
+                        
+                        ni=lasti+self.cols
+
+                        if ni>len(self.data)-1:
+                            ni=ni-len(self.data)
+                        else:
+                            self.select(ni)
+                            return False
+                    else:
+                        self.select(0)
+                        return False
+                elif fs_pressed=='up':
+                    if self.index_selected:
+
+                        lasti=self.index_selected[-1]
+                        ni=lasti-self.cols
+                        if ni<0:
+                            ni=ni+len(self.data)
+                        else:
+                            self.select(ni)
+                            return False
+                    else:
+                        self.select(0)
+                        return False
+                elif fs_pressed=='left':  # deal with cycle
+                    modifiers = set(modifiers)
+                    if self._modifiers & modifiers:
+                        return False
+
+                    if self.index_selected:
+
+                        lasti=self.index_selected[-1]
+                        ni=lasti-1
+
+                        if lasti%self.cols==0:
+                            ni=ni+self.cols
+
+                        if ni<0:
+                            ni=len(self.data)-1
+
+                        # print(ni)
+                        if not lasti%self.cols==0:
+                            self.select(ni)
+                            return False
+                    else:
+                        self.select(0)
+                        return False
+                elif fs_pressed=='right':  # deal with cycle
+                    modifiers = set(modifiers)
+                    if self._modifiers & modifiers:
+                        return False
+                        
+                    if self.index_selected:
+
+                        lasti=self.index_selected[-1]
+                        ni=lasti+1
+
+                        if ni%self.cols==0:
+                            ni=ni-self.cols
+
+                        if ni>=len(self.data):
+                            ni=0
+                        # print(ni)
+                        if not ni%self.cols==0:
+                            self.select(ni)
+                            return False
+                    else:
+                        self.select(0)
+                        return False
+
+            next=self._focus_map.get(fs_pressed,None)
+            if next:
+                if next=='last_focused':
+                    next=FocusBehavior.last_focused
+                    if next and self!=next:
+                        self.focus = False
+
+                        next.focus = True
+
+                        return True
+                    else:
+                        return False
+                if isinstance(next,(tuple,list)):
+                    if len(next)==3:
+                        next0=next[0]
+                        cond=next[1]
+                        next1=next[2]
+                        if next0=='last_focused':
+                            next0=FocusBehavior.last_focused
+
+                        if cond(self,utils.get_id(next0)):
+                            next=next0
+                        else:
+                            next=next1
+                    elif len(next)==2:
+                        next0=next[0]
+                        cond=next[1]
+                        if next0=='last_focused':
+                            next0=FocusBehavior.last_focused
+
+                        cond(self,utils.get_id(next0))
+                        next=next0
+
+                if hasattr(next,'__call__'):
+                    next=next(self)
+                    if next in {False,None}:
+                        next=self
+
+
+
+                if isinstance(next,str):
+                    if next=='self':
+                        next=self
+                    else:
+                        next=utils.get_kvApp().ids[next]
+                
+                if self!=next:
+                    self.focus = False
+
+                    next.focus = True
+
+                    return True
+                else:
+                    return False
+
+        else:
+            if keycode[1] in ('spacebar','enter'):
+                modifiers = set(modifiers)
+                if self._modifiers & modifiers:
+                    return False
+                if hasattr(self,'trigger_action'):
+                    self.trigger_action()
+            else:
+                if not self.disable_fallback_nav:
+                    if self.cols!=None:
+                        rows=math.ceil(len(self.data)/self.cols)
+                        cols=self.cols
+                    else:
+                        rows=self.rows
+                        cols=math.ceil(len(self.data)/self.rows)
+
+                    if keycode[1] == 'tab':  # deal with cycle
+                        modifiers = set(modifiers)
+                        if self._modifiers_but_shift & modifiers:
+                            return False
+                        if 'shift' in modifiers:
+                            next = self.get_focus_previous()
+                        else:
+                            next = self.get_focus_next()
+                        if next:
+                            self.focus = False
+
+                            next.focus = True
+
+                        return True
+                    elif keycode[1] in ('down'):  # deal with cycle
+                        modifiers = set(modifiers)
+                        if self._modifiers & modifiers:
+                            return False
+                        # print('do-down')
+                        if self.index_selected:
+                            lasti=self.index_selected[-1]
+                            
+                            ni=lasti+cols
+                            
+                            # print(f"{ni=}")
+                            if ni>len(self.data)-1:
+                                if ni<cols*rows:
+                                    ni=len(self.data)-1
+                                else:
+                                    # ni=ni-len(self.data)
+                                    ni=ni-cols*rows
+
+                            self.select(ni)
+                        else:
+                            self.select(0)
+                    elif keycode[1] in ('up'):  # deal with cycle
+                        modifiers = set(modifiers)
+                        if self._modifiers & modifiers:
+                            return False
+                        if self.index_selected:
+
+                            lasti=self.index_selected[-1]
+                            ni=lasti-cols
+                            if ni<0:
+                                # ni=ni+len(self.data)
+                                ni=ni+cols*rows
+                                if ni>=len(self.data):
+                                    ni=len(self.data)-1
+                                # if ni+self.cols*rows<len(self.data):
+                                #     ni=ni+self.cols*rows
+                                # else:
+                                #     if self.cols>1:
+                                #         ni=ni+self.cols*rows-self.cols
+                                #     else:
+                                #         ni=lasti
+
+                            self.select(ni)
+                        else:
+                            self.select(0)
+                    elif keycode[1] in ('left'):  # deal with cycle
+                        modifiers = set(modifiers)
+                        if self._modifiers & modifiers:
+                            return False
+
+                        if self.index_selected:
+
+                            lasti=self.index_selected[-1]
+                            ni=lasti-1
+
+                            if lasti%cols==0:
+                                ni=ni+cols
+
+                            if ni<0:
+                                ni=len(self.data)-1
+
+                            # print(ni)
+                            self.select(ni)
+                        else:
+                            self.select(0)
+                    elif keycode[1] in ('right'):  # deal with cycle
+                        modifiers = set(modifiers)
+                        if self._modifiers & modifiers:
+                            return False
+                            
+                        if self.index_selected:
+
+                            lasti=self.index_selected[-1]
+                            ni=lasti+1
+
+                            if ni%cols==0:
+                                ni=ni-cols
+
+                            if ni>=len(self.data):
+                                ni=0
+                            # print(ni)
+                            self.select(ni)
+                        else:
+                            self.select(0)
+
+            
+
+        return False
+
+
+class HoveraRecycleDataViewBehavior(RecycleDataViewBehavior):
+    ''' Add selection support to the Label '''
+    index = None
+    selected = BooleanProperty(False)
+    selectable = BooleanProperty(True)
+    meta = ObjectProperty({})
+
+    option_selected=BooleanProperty(False)
+    touch_button=OptionProperty('',options=('','left','right'))
+    state=OptionProperty('normal',options=('normal','down'))
+    buttonbehavior=BooleanProperty(False)
+    selected_color=ColorProperty([.5, 0.5, .5, .3])
+    def __init__(self,**kwargs):
+        self.register_event_type('on_release')
+        super(HoveraRecycleDataViewBehavior, self).__init__(**kwargs)
+    def on_parent(self,ins,parent):
+        if parent and hasattr(parent, 'selected_color'):
+            self.selected_color=parent.selected_color
+        else:
+            self.selected_color=self.bcolor_down
+
+    def on_selected(self,ins,v):
+        if v :
+            self.bcolor=self.selected_color
+        else:
+            try:
+                self.bcolor=self.parent.parent.data[self.index].get('bcolor',(0,0,0,0))
+            except:
+                self.bcolor=(0,0,0,0)
+
+    # def refresh_view_attrs(self, rv, index, data):
+    #     ''' Catch and handle the view changes '''
+    #     self.index = index
+    #     data['lcolor']=data.get('lcolor','gray')
+    #     data['color']=data.get('color',(1,1,1,1))
+    #     data['valign']=data.get('valign','middle')
+    #     data['halign']=data.get('halign','left')
+    #     data['padding']=data.get('padding',4)
+    #     data['selectable']=data.get('selectable',True)
+    #     data['buttonbehavior']=data.get('buttonbehavior',False)
+    #     data['bcolor_down']=data.get('bcolor_down',self.selected_color)
+
+    #     selected=data.get('selected',False)
+    #     if selected:
+    #         Clock.schedule_once(lambda dt:self.parent.parent.select(self.index))
+        
+    #     data=utils._preprocess(**data)
+    #     Clock.schedule_once(lambda dt:utils.setattrs(self,**data))
+    #     return super(HoveraRecycleDataViewBehavior, self).refresh_view_attrs(
+    #         rv, index, data
+    #         )
+
+    def on_touch_down(self, touch):
+        ''' Add selection on touch down '''
+        self.state='normal'
+        if touch.button=='left':
+            if super(HoveraRecycleDataViewBehavior, self).on_touch_down(touch):
+                return True
+            if self.selectable and self.collide_point(*touch.pos):
+                if self.buttonbehavior:
+                    self.state='down'
+                if touch.is_double_tap:
+                    self.parent.parent.dispatch('on_double_click',self.index)
+                if self.selectable:
+                    self.touch_button='left'
+                    self.option_selected=False
+                    return self.parent.select_with_touch(self.index, touch)
+        elif touch.button=='right':
+            if super(HoveraRecycleDataViewBehavior, self).on_touch_down(touch):
+                return True
+            if self.selectable and self.collide_point(*touch.pos):
+                self.touch_button='right'
+                self.parent.parent.index_option_selected=self.index
+                self.parent.parent.widget_option_selected=self
+                self.parent.parent.dispatch('on_option_selection',self.index)
+        else:
+            self.option_selected=False
+            self.touch_button=''
+    def on_touch_up(self,touch):
+        if self.selectable and self.collide_point(*touch.pos) and self.state=='down':
+            self.dispatch('on_release',self.parent.parent,self.index)
+            self.state='normal'
+    def on_state(self,ins,v):
+        if v=='down':
+            self.bcolor=getattr(self,'bcolor_down',[.345, .345, .345, 1])
+        else:
+            self.bcolor=getattr(self,'bcolor_normal',[.2, .64, .8, 1])
+
+    def apply_selection(self, rv, index, is_selected):
+        ''' Respond to the selection of items in the view. '''
+        self.selected = is_selected
+        if is_selected:
+            self.bcolor=getattr(self,'selected_color',self.bcolor_down)
+        else:
+            self.bcolor=self.bcolor_normal
+        # print(f'{is_selected = }')
+    def on_ref_press(self,refvalue):
+        pass
+        self.parent.parent.index_ref_pressed
+        self.parent.parent.dispatch('on_ref_press',refvalue)
+
+    def on_release(self,rv,index):
         pass

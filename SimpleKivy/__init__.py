@@ -34,9 +34,11 @@
 # if size[1]:
 #     Config.set('graphics', 'height', size[1])
 
-from kivy.logger import Logger
+
 import os
-Logger.info(f'SimpleKivy: Installed at "{os.path.abspath(__file__)}"')
+if not  'SIMPLEKIVY_NO_CONSOLELOG' in os.environ:
+	from kivy.logger import Logger
+	Logger.info(f'SimpleKivy: Installed at "{os.path.abspath(__file__)}"')
 
 # from .SimpleKivy import *
 

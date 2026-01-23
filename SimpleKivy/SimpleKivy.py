@@ -1,23 +1,30 @@
+
 import sys
 import os
+os.environ['KIVY_GL_BACKEND'] = 'sdl2'
+KIVY_DOC= 'KIVY_DOC' in os.environ
 import pathlib
 # package_path = os.path.abspath(os.path.join(os.path.dirname(__file__), '..'))
 # print(package_path)
 # os.environ['PYTHONPATH'] = package_path + os.pathsep + os.environ.get('PYTHONPATH', '')
 # # print(__name__)
 NOTKEY=-67191210201
-os.environ['KIVY_GL_BACKEND'] = 'sdl2'
+
 from .utils import infinite, CaseInsensitiveDict,_Void,is_number,find_letter_number_pairs, auto_config, re_search,get_kvApp
-from .utils import import_from, get_transition, _event_manager, abc, mdi
-from .utils import Colors,Fonts,hex2rgb, resolve_color,pos_hints,app_schedule_get_call,app_get
+from .utils import import_from, get_transition, _event_manager, abc, mdi,get_last_focused
+from .utils import Colors,Fonts,hex2rgb, resolve_color,pos_hints,app_schedule_get_call,app_get,_preprocess
 from .utils import BrowserHistory
 from .utils import markup_str
+from .utils import setattrs,get_id,fun_debug
 from . import utils
 import pickle
 import types
 from . import _docs
 from kivy.uix.widget import Widget
 from inspect import signature
+
+
+
 
 addcolors='r g b w y gray brown orange'.split()
 iadd=-1
@@ -207,103 +214,7 @@ else:
 
 
 
-def _preproces(**kwargs):
-    # if 'size' in kwargs:
-    #     if isinstance()
-    nkwargs={}
-    for k,v in kwargs.items():
-        nkwargs[k]=v
-        if k=='key':
-            nkwargs['k']=nkwargs.pop('key')
-        elif k=='size':
-            if isinstance(v,(str,infinite)):
-                if isinstance(v,infinite):
-                    v=v._name
-                # print(v)
-                # if 'children' in v:
-                #     if 'y' in v:
-                #         v=0
-                #         for
-                # print(v)
-                if v.isnumeric():
-                    v=f'x{v}y{v}'
 
-                xs=re_search(r"x[0-9]+",v,flags=re.IGNORECASE)
-                ys=re_search(r"y[0-9]+",v,flags=re.IGNORECASE)
-                nkwargs['size']=[0,0]
-                # print(xs,ys)
-                if xs:
-                    snum=re.sub(r"\D", "", xs)
-                    nkwargs['size_hint_x']=None
-                    nkwargs['size'][0]=int(snum)
-                if ys:
-                    snum=re.sub(r"\D", "", ys)
-                    nkwargs['size_hint_y']=None
-                    nkwargs['size'][1]=int(snum)
-                # print(nkwargs)
-            # elif isinstance(v,infinite):
-            #     # print(v.name)
-            #     v=v._name
-            #     xs=re_search(r"x[0-9]+",v,flags=re.IGNORECASE)
-            #     ys=re_search(r"y[0-9]+",v,flags=re.IGNORECASE)
-            #     nkwargs['size']=[0,0]
-            #     if xs:
-            #         snum=re.sub(r"\D", "", xs)
-            #         nkwargs['size_hint_x']=None
-            #         nkwargs['size'][0]=int(snum)
-            #     if ys:
-            #         snum=re.sub(r"\D", "", ys)
-            #         nkwargs['size_hint_y']=None
-            #         nkwargs['size'][1]=int(snum)
-        elif 'color' in k:
-            if isinstance(v,str):
-                if not '#' in v:
-                    try:
-                        v=Colors[v]
-                    except:
-                        raise ValueError(f"Invalid color string \"{v}\".\nValid colors are:{Colors.keys()}")
-                else:
-                    try:
-                        v=hex2rgb(v, alpha=255, vmax=1)
-                    except:
-                        raise ValueError(f"Invalid color string \"{v}\"")
-            # elif isinstance(v,dict):
-                # for key,val in v.items():
-                #     v[key]=utils.rgba2hex(utils.resolve_color(val))
-                #     print(v[key])
-
-                    
-            nkwargs[k]=v
-        elif 'transition' in k:
-            if isinstance(v,str):
-                import kivy.uix.screenmanager as smm
-                # v=v.lower()
-                match v:
-                    case 'no':
-                        v=smm.NoTransition()
-                    case 'slide':
-                        v=smm.SlideTransition()
-                    case 'card':
-                        v=smm.CardTransition()
-                    case 'fade':
-                        v=smm.FadeTransition()
-                    case 'wipe':
-                        v=smm.WipeTransition()
-                    case 'swap':
-                        v=smm.SwapTransition()
-                    case 'fallout':
-                        v=smm.FallOutTransition()
-                    case 'risein':
-                        v=smm.RiseInTransition()
-
-            nkwargs[k]=v
-        elif 'font_name'==k:
-            nkwargs[k]=Fonts.get(v,v)
-        elif 'schedule_once'==k:
-            nkwargs.pop(k)
-            Clock.schedule_once(v)
-
-    return nkwargs
 
 _future_elements=[]
 def _future_process_elements(self):
@@ -602,8 +513,17 @@ def _post_process_elements(self):
         _post_elements[wtype]=[]
     # print('after',f"{_post_elements['LabelLike'] = }")
 
-def _create_callback(self,event_name):
+def _create_callback(self,el,on_event=None):
     # Define the callback function
+    if on_event==None:
+        on_event=getattr(el,'on_event')
+    if getattr(el,'do_dot_subevent',False):
+        event_name=str(el.id)+'.'+str(on_event)
+    else:
+        event_name=str(el.id)
+
+    # print(el.do_dot_subevent,f"{on_event = }")
+
     def callback(instance, *args):
         # Print the widget and event name
         # print(event_name)
@@ -628,12 +548,12 @@ def _future_process_binds(self):
             elif isinstance(el.on_event[0],str):
                 do_dot_subevent=getattr(el,'do_dot_subevent',None)
                 if do_dot_subevent:
-                    binds={}
+                    # binds={}
                     for i,on_event in enumerate(el.on_event):
                         # print(on_event)
-                        subevent=str(el.id)+'.'+str(on_event)
+                        # subevent=str(el.id)+'.'+str(on_event)
                         # call=
-                        el.bind(**{on_event: _create_callback(self,subevent)})
+                        el.bind(**{on_event: _create_callback(self,el,on_event)})
 
                         # setattr(el,f'__{on_event}',lambda *args:print(subevent) )
                         # binds[on_event]=getattr(el,f'__{on_event}')
@@ -658,44 +578,103 @@ def _future_process_binds(self):
             # for event,callback in el.on_event.items():
             #     el.bind(**{event : callback})
         else:
-            if getattr(el,'do_dot_subevent',None):
-                el.bind(**{el.on_event:lambda *args: self._callback_w_subev(*args,subevent=el.on_event) })
-            else:
-                el.bind(**{el.on_event:self._callback})
+            # el.bind(**{el.on_event:self._callback})
+            el.bind(**{el.on_event:_create_callback(self,el,el.on_event)})
+
+            # if getattr(el,'do_dot_subevent',None):
+            #     # el.bind(**{el.on_event:lambda *args: self._callback_w_subev(*args,subevent=el.on_event) })
+            #     el.bind(**{el.on_event:lambda *args: self._callback_w_subev(*args,subevent=el.on_event) })
+            # else:
+            #     el.bind(**{el.on_event:self._callback})
     _future_bind=[]
 
 def locked_screen(func):
     def wrapper(*args,**kwargs):
         self=get_kvApp()
-        self.lock()
-        # def do(*args,**kwargs):
-        #     self.sleep_in_thread(1)
-        #     ans=func(*args,**kwargs)
-        #     self.unlock()
-        #     return ans
-        # Clock.schedule_once(lambda dt: do(),.1)
         
-        future=self.poolt.submit(func,*args,**kwargs)
-        # future=self.poolt.submit(do,*args,**kwargs)
-        future.add_done_callback(lambda f:self.unlock())
-        # result=func(*args,**kwargs)
-        # return future.result()
+        # self.lock()
+        def do(*args,**kwargs):
+            Clock.unschedule(self.dt_lock)
+            Clock.unschedule(self.dt_unlock)
+
+            Clock.schedule_once(self.dt_unlock)
+            Clock.schedule_once(self.dt_lock)
+            ans=func(*args,**kwargs)
+            Clock.schedule_once(self.dt_unlock)
+            return ans
+        # Clock.schedule_once(lambda dt: do(),.1)
+        future=self.poolt.submit(do,*args,**kwargs)
+        
+        # Clock.schedule_once(lambda dt:self.lock())
+        # future=self.poolt.submit(func,*args,**kwargs)
+        # future.add_done_callback(lambda f:Clock.schedule_once(lambda dt:self.unlock()))
         return future
-    def args_preprocessor(*args, **kwargs):
-        kel = f(*args, **kwargs)
-        return kel
+    # def args_preprocessor(*args, **kwargs):
+    #     kel = f(*args, **kwargs)
+    #     return kel
     f=func
     wrap=wrapper
-    wrap.__doc__ = f.__doc__
-    wrap.__name__ = f.__name__
-    wrap.__module__ = f.__module__
-    wrap.__qualname__ = f.__qualname__
-    wrap.__annotations__ = getattr(f, '__annotations__', {})
-    wrap.__signature__ = signature(f)
-    wrap.__widget_ctor__=f.__name__
+    if KIVY_DOC:
+        wrap.__doc__ = f.__doc__
+        wrap.__name__ = f.__name__
+        wrap.__module__ = f.__module__
+        wrap.__qualname__ = f.__qualname__
+        wrap.__annotations__ = getattr(f, '__annotations__', {})
+        wrap.__signature__ = signature(f)
+        wrap.__widget_ctor__=f.__name__
 
     return wrapper
 
+def locked_screen_at_pool(pool):
+    def _locked_screen_at_pool(func):
+        # def wrapper(*args,**kwargs):
+        #     self=get_kvApp()
+        #     Clock.schedule_once(lambda dt:self.lock())
+        #     # self.lock()
+        #     # def do(*args,**kwargs):
+        #     #     self.sleep_in_thread(1)
+        #     #     ans=func(*args,**kwargs)
+        #     #     self.unlock()
+        #     #     return ans
+        #     # Clock.schedule_once(lambda dt: do(),.1)
+            
+        #     future=pool.submit(func,*args,**kwargs)
+        #     # future=self.poolt.submit(do,*args,**kwargs)
+        #     future.add_done_callback(lambda f:Clock.schedule_once(lambda dt:self.unlock()))
+        #     # result=func(*args,**kwargs)
+        #     # return future.result()
+        #     return future
+        # # def args_preprocessor(*args, **kwargs):
+        # #     kel = f(*args, **kwargs)
+        # #     return kel
+
+        def wrapper(*args,**kwargs):
+            self=get_kvApp()
+            Clock.unschedule(self.dt_lock)
+            Clock.unschedule(self.dt_unlock)
+
+            Clock.schedule_once(self.dt_unlock)
+            Clock.schedule_once(self.dt_lock)
+            
+            future=pool.submit(func,*args,**kwargs)
+            future.add_done_callback(lambda f:Clock.schedule_once(self.dt_unlock))
+            return future
+
+        f=func
+        wrap=wrapper
+        if KIVY_DOC:
+            wrap.__doc__ = f.__doc__
+            wrap.__name__ = f.__name__
+            wrap.__module__ = f.__module__
+            wrap.__qualname__ = f.__qualname__
+            wrap.__annotations__ = getattr(f, '__annotations__', {})
+            wrap.__signature__ = signature(f)
+            wrap.__widget_ctor__=f.__name__
+
+        return wrapper
+    return _locked_screen_at_pool
+
+_saved_to_config={}
 def skwidget(f):
     def args_preprocessor(*args, **kwargs):
         sz=kwargs.get('size',None)
@@ -706,11 +685,28 @@ def skwidget(f):
         # print('499',do_dot_subevent)
         bind=kwargs.pop('bind',None)
 
+        save_to_config=kwargs.pop('save_to_config',None)
 
 
-        kwargs=_preproces(**kwargs)
-        global _future_elements, _future_bind
+        kwargs=_preprocess(**kwargs)
+        global _future_elements, _future_bind,_saved_to_config
         kel = f(*args, **kwargs)
+
+        if save_to_config:
+
+            if hasattr(kel,'id'):
+                if isinstance(save_to_config,str):
+                    stc=set((save_to_config,))
+                elif isinstance(save_to_config,(tuple,list,set)):
+                    stc=set(save_to_config)
+                else:
+                    raise ValueError(f'Invalid "save_to_config" type: "{type(save_to_config)}". Valid types are str, list, tupple, set')
+
+                _saved_to_config[kel.id]=stc
+                # print(f"{save_to_config =}")
+
+            else:
+                raise ValueError(f'A widget id ("k" argument) needs to be specified to use "save_to_config" functionality')
 
         if bind:
             Clock.schedule_once(lambda dt: kel.bind(**bind))
@@ -748,25 +744,18 @@ def skwidget(f):
 
     wrap=args_preprocessor
     # Copy all the important metadata
-    wrap.__doc__ = f.__doc__
-    wrap.__name__ = f.__name__
-    wrap.__module__ = f.__module__
-    wrap.__qualname__ = f.__qualname__
-    wrap.__annotations__ = getattr(f, '__annotations__', {})
-    
-    # Try to copy signature if available (Python 3.3+)
-    wrap.__signature__ = signature(f)
-    
-    wrap.__widget_ctor__=f.__name__
-    
-    # Copy annotations (type hints)
-    # if hasattr(f, '__annotations__'):
-    #     wrap.__annotations__ = f.__annotations__
-    if not wrap.__doc__:
-        wrap.__doc__=_docs.tbd_widfun
-    #     wrap.__doc__+=_docs.com
-    # else:
-    #     wrap.__doc__=_docs.com
+
+    if KIVY_DOC:
+        wrap.__doc__ = f.__doc__
+        wrap.__name__ = f.__name__
+        wrap.__module__ = f.__module__
+        wrap.__qualname__ = f.__qualname__
+        wrap.__annotations__ = getattr(f, '__annotations__', {})
+        
+        # Try to copy signature if available (Python 3.3+)
+        wrap.__signature__ = signature(f)
+        
+        wrap.__widget_ctor__=f.__name__
 
     return wrap
 
@@ -775,15 +764,16 @@ def _widget_ctor(f):
         kel = f(*args, **kwargs)
         return kel
     wrap=args_preprocessor
-    wrap.__doc__ = f.__doc__
-    wrap.__name__ = f.__name__
-    wrap.__module__ = f.__module__
-    wrap.__qualname__ = f.__qualname__
-    wrap.__annotations__ = getattr(f, '__annotations__', {})
-    wrap.__signature__ = signature(f)
-    wrap.__widget_ctor__=f.__name__
-    if not wrap.__doc__:
-        wrap.__doc__=_docs.tbd_widfun
+    if KIVY_DOC:
+        wrap.__doc__ = f.__doc__
+        wrap.__name__ = f.__name__
+        wrap.__module__ = f.__module__
+        wrap.__qualname__ = f.__qualname__
+        wrap.__annotations__ = getattr(f, '__annotations__', {})
+        wrap.__signature__ = signature(f)
+        wrap.__widget_ctor__=f.__name__
+    # if not wrap.__doc__:
+    #     wrap.__doc__=_docs.tbd_widfun
     return wrap
 
 def MiniApp(f):
@@ -814,23 +804,70 @@ def MiniApp(f):
 
         return ans
     wrap=miniapp_func_wrapper
-    wrap.__doc__ = f.__doc__
-    wrap.__name__ = f.__name__
-    wrap.__module__ = f.__module__
-    wrap.__qualname__ = f.__qualname__
-    wrap.__annotations__ = getattr(f, '__annotations__', {})
-    wrap.__signature__ = signature(f)
-    wrap.__widget_ctor__=f.__name__
-    if not wrap.__doc__:
-        wrap.__doc__=_docs.tbd_widfun
+    if KIVY_DOC:
+        wrap.__doc__ = f.__doc__
+        wrap.__name__ = f.__name__
+        wrap.__module__ = f.__module__
+        wrap.__qualname__ = f.__qualname__
+        wrap.__annotations__ = getattr(f, '__annotations__', {})
+        wrap.__signature__ = signature(f)
+        wrap.__widget_ctor__=f.__name__
+        if not wrap.__doc__:
+            wrap.__doc__=_docs.tbd_widfun
     return wrap
+
+# def MiniAppModal(f):
+#     def miniapp_func_wrapper(*args,**kwargs):
+#         global ids,_future_elements,_post_elements,_future_bind, MyApp,_MiniApp
+#         oids=ids.copy()
+#         o_future_elements=_future_elements.copy()
+#         o_future_bind=_future_bind.copy()
+#         o_post_elements=_post_elements.copy()
+
+#         ids={}
+#         _future_elements=[]
+#         _future_bind=[]
+#         _post_elements={ k:[] for k in o_post_elements }
+        
+#         oMyApp=MyApp
+#         MyApp=_MiniApp
+#         ################################
+#         ans=f(*args,**kwargs)
+#         ################################
+#         MyApp=oMyApp
+#         _future_elements=o_future_elements
+#         _future_bind=o_future_bind
+#         _post_elements=o_post_elements
+#         ids=oids
+        
+#         _future_elements.append(ans)
+
+#         return ans
+#     wrap=miniapp_func_wrapper
+#     if KIVY_DOC:
+#         wrap.__doc__ = f.__doc__
+#         wrap.__name__ = f.__name__
+#         wrap.__module__ = f.__module__
+#         wrap.__qualname__ = f.__qualname__
+#         wrap.__annotations__ = getattr(f, '__annotations__', {})
+#         wrap.__signature__ = signature(f)
+#         wrap.__widget_ctor__=f.__name__
+#         if not wrap.__doc__:
+#             wrap.__doc__=_docs.tbd_widfun
+#     return wrap
 
 def skwidget_only_preprocess(f):
     def wrap(*args, **kwargs):
-        kwargs=_preproces(**kwargs)
+        kwargs=_preprocess(**kwargs)
         kel = f(*args, **kwargs)
         return kel
     return wrap
+
+def _process_config_set(self):
+    global _saved_to_config
+    # print(f"{_saved_to_config =}")
+    self._config.update(_saved_to_config)
+    # print(f"{self._config =}")
 
 
 def process_added_widgets():
@@ -838,6 +875,7 @@ def process_added_widgets():
     _future_process_elements(self)
     _post_process_elements(self)
     _future_process_binds(self)
+    _process_config_set(self)
 paw=process_added_widgets
 
 def _ensure_bttn_not_draggable(children):
@@ -877,21 +915,6 @@ if 'win' == platform.lower():
 # print(platform)
 
 class _MiniApp:
-    # window_is_maximized = BooleanProperty(False)
-    # _top_widget=None
-    # _subtop_widget=None
-    # def _get_tw(self):
-    #     return self._top_widget
-    # def _set_tw(self,v):
-    #     self._top_widget=v
-    #     return True
-    # top_widget=kvw.AliasProperty(_get_tw,_set_tw)
-    # def _get_stw(self):
-    #     return self._subtop_widget
-    # def _set_stw(self,v):
-    #     self._subtop_widget=v
-    #     return True
-    # subtop_widget=kvw.AliasProperty(_get_stw,_set_stw)
     def __init__(
         self,
         layout=[[]],
@@ -909,73 +932,36 @@ class _MiniApp:
         ):
         if event_manager==None:
             event_manager=_event_manager
-
-        # self._is_windows = True if platform.lower()=='win' else False
         self.Clock=Clock
         self.mdi=mdi
         
         self.kvWindow=utils.Window
 
-        # minimum_width=kwargs.pop('minimum_width',None)
-        # minimum_height=kwargs.pop('minimum_height',None)
-        # minimum_size=kwargs.pop('minimum_size',None)
-        # if minimum_width!=None:
-        #     self.minimum_width=minimum_width
-        # if minimum_height!=None:
-        #     self.minimum_height=minimum_height
-        # if minimum_size!=None:
-        #     self.minimum_size=minimum_size
-
         self.post_actions=[]
         
         size=kwargs.pop('size',None)
         location=kwargs.pop('location',None)
-        # if size:
-        #     self.post_actions.append(action(self.Resize,*size))
-        # if location:
-        #     left,top=location
-        #     if left!=None:
-        #         self.post_actions.append(action(setattr,self.kvWindow,'left',location[0]))
-        #     if top!=None:
-        #         self.post_actions.append(action(setattr,self.kvWindow,'top',location[1]))
-        # def _do_maximize(*largs):
-        #     self.window_is_maximized = True
-        # def _do_restore(*largs):
-        #     self.window_is_maximized = False
-        # self.kvWindow.bind(on_maximize=_do_maximize, on_restore=_do_restore)
-
-        # if custom_titlebar:
-        #     pass
-        #     self.kvWindow.custom_titlebar=True
-        #     try:
-        #         first_el=layout[0][0]
-        #     except:
-        #         first_el=layout[0]
-        #     self.kvWindow.set_custom_titlebar(first_el)
-        #     tbw=self.kvWindow.titlebar_widget
-        #     if hasattr(tbw,'children'):
-        #         _ensure_bttn_not_draggable(tbw.children)
+        
 
         self.title=title
         self.poolt=ThreadPoolExecutor(thread_name_prefix='MiniApp')
         self.queue={}
-        # self._leaving=False
-
-        # self._filebrowser={}
-        # self._lock=None
 
         self._nk=0
-        class IDS(dict):
-            def __getattr__(self,name):
-                return self.__getitem__(name)
+        
 
         global ids
-        self.ids=IDS()
+        self.ids=utils.IDS()
         self._ids={}
         if not layout_class:
             rows=len(layout)
-            # self._layout=kvw.GridLayoutB(rows=rows,**_preproces(**layout_args))
-            self._layout=skivify(kvw.GridLayoutB,k=k,rows=rows,**layout_args)
+            # self._layout=kvw.GridLayoutB(rows=rows,**_preprocess(**layout_args))
+            kvWd = kvw.GridLayoutB
+            if 'HAS_GRADIENT' in os.environ:
+                from SimpleKivy.kvGradient import GradientGrid
+                kvWd=GradientGrid
+                layout_args['gradient']=layout_args.get('gradient',['linear-gradient',dict(colors=['',''],size=[2,2])])
+            self._layout=skivify(kvWd,k=k,rows=rows,**layout_args)
             max_cols = 0
             for row in layout:
                 if len(row) > max_cols:
@@ -987,9 +973,6 @@ class _MiniApp:
                 for el in row:
                     elnum += 1
                     kivy_el = el
-                    # if kivy_el.id in ids:
-                    #     del ids[kivy_el.id]
-                    # kivy_el.id=NOTKEY
                     self._layout.add_widget(kivy_el)
 
                 lenrow = len(row)
@@ -1001,27 +984,22 @@ class _MiniApp:
                             Fill(),
                         )
         else:
+            if 'HAS_GRADIENT' in os.environ:
+                if not hasattr(layout_class,'gradient'):
+                    from SimpleKivy.kvGradient import GradientBehavior
+                    layout_args['over_class']=GradientBehavior
+                    layout_args['gradient']=layout_args.get('gradient',['linear-gradient',dict(colors=['',''],size=[2,2])])
             try:
                 self._layout=layout_class(k=k,**layout_args)
             except:
                 self._layout=skivify(layout_class,k=k,**layout_args)
             for kivy_el in layout:
-                # kivy_el.id=NOTKEY
-                # if kivy_el.id in ids:
-                #     del ids[kivy_el.id]
                 self._layout.add_widget(kivy_el)
         self._triggers={}
         self.event_manager=event_manager
         self.thread_event=self.submit_thread_event
         self.thread_event_at=self.submit_thread_event_at
-        # self.get_group=kvw.ToggleButtonBehavior.get_widgets
         self.hidden={}
-
-        # self.remove_on_click = False
-        # def on_touch_down(instace, touch):
-        #     if self.remove_on_click and touch.button in ('left','middle','right'):
-        #         self.remove_top_widget()
-        # self._layout.bind(on_touch_down=on_touch_down)
 
         _future_process_elements(self)
         _post_process_elements(self)
@@ -1029,35 +1007,9 @@ class _MiniApp:
 
         self.paw=self.process_added_widgets
         self.Clock.schedule_once(lambda dt: setattr(self,'alpha',alpha))
-        
-        # self._keep_on_top=keep_on_top
-        # self.Clock.schedule_once(lambda dt: setattr(self,'keep_on_top',keep_on_top))
-
-        # self._hwnd=None
-        
-        # if icon=='skdata/logo/simplekivy-icon-32.png':
-        #     self.ico=resource_find('skdata/logo/simplekivy-icon-256.ico')
-
-        # Clock.schedule_once(lambda dt: self.on_icon(self,self.get_application_icon()))
-        # super().__init__(icon=icon,**kwargs)
 
     def __getattr__(self,name):
-        # print(name)
-        # Redirect to parent
-        # self.APP=App.get_running_app()
-        # parent_attrs=(
-        #     'sleep_in_thread',
-        #     'on_stop',
-        #     'is_leaving',
-        #     '_leaving',
-        #     )
-        # for pattr in parent_attrs:
-        #     setattr(self,pattr,getattr(self.APP,pattr))
-
-        ####################
         return getattr(App.get_running_app(),name)
-        # except:
-        #     raise AttributeError(f"'{self}' object has no attibute '{name}'.")
 
     def thread_pool_new(self,name,max_workers=None):
         self.queue[name]=ThreadPoolExecutor(max_workers=max_workers,thread_name_prefix=name)
@@ -1065,7 +1017,6 @@ class _MiniApp:
         self.queue[name]=ThreadPoolExecutor(max_workers=1,thread_name_prefix=name)
 
     def destroy_widget(self,k,default=None):
-        
         el=self.ids.get(k,default)
         if el:
             del self.ids[k]
@@ -1114,14 +1065,14 @@ class _MiniApp:
 
             if isinstance(prop,str):
                 if not _kw_prepro:
-                    kw=_preproces(**{prop:val})
+                    kw=_preprocess(**{prop:val})
                     trigger=Clock.create_trigger(lambda *args:setattr(widget,prop,kw[prop]),timeout)
                     trigger()
                 else:
                     trigger=Clock.create_trigger(lambda *args:setattr(widget,prop,val),timeout)
                     trigger()
             else:
-                kwargs=_preproces(**kwargs)
+                kwargs=_preprocess(**kwargs)
                 for p,v in kwargs.items():
                     self.__call__(k,p,v,_kw_prepro=True)
         except Exception as e:
@@ -1147,8 +1098,17 @@ class _MiniApp:
         return future
     def __getitem__(self, key):
         return self.ids[key]
-    def schedule_get_call(self,key,method,*args,**kwargs):
-        Clock.schedule_once(lambda dt:getattr(self.ids[key],method)(*args,**kwargs))
+    def schedule_get_call(self,key,method,*args,timeout=0,**kwargs):
+        if isinstance(key,str):
+            wid=self.ids[key]
+        else:
+            wid=key
+        Clock.schedule_once(lambda dt:getattr(wid,method)(*args,**kwargs),timeout=timeout)
+    def schedule_getattr_call(self,*args,**kwargs):
+        '''
+        Same as schedule_get_call.
+        '''
+        self.schedule_get_call(*args,**kwargs)
     def keys(self):
         return self.ids.keys()
     def values(self):
@@ -1176,6 +1136,8 @@ class _MiniApp:
         return self._layout
     def run(self):
         return self.build()
+    def reuse(self,*args,**kwargs):
+        self.trigger_event('__Reuse__',*args,**kwargs)
 
     @property
     def app(self):
@@ -1188,6 +1150,46 @@ class _MiniApp:
     @property
     def id(self):
         return self._layout.id
+
+    def hide(self,*key_list,shrink=True):
+        for k in key_list:
+            if isinstance(k,str):
+                wid=self.__getitem__(k)
+            else:
+                wid=k
+            s=getattr(wid,'size',(100,100)).copy()
+            sh=getattr(wid,'size_hint',(1,1)).copy()
+            o=getattr(wid,'opacity',1)
+            d=getattr(wid,'disabled',False)
+
+            if k not in self.hidden:
+                self.hidden[k]=(s,sh,o,d)
+            if shrink:
+                setattr(wid,'size',(1,1))
+                setattr(wid,'size_hint',(None,None))
+            setattr(wid,'opacity',0)
+            setattr(wid,'disabled',True)
+    def unhide(self,*key_list,enforce={}):
+        for k in key_list:
+            if isinstance(k,str):
+                wid=self.__getitem__(k)
+            else:
+                wid=k
+            try:
+                s,sh,o,d=self.hidden.get(k)
+            except:
+                s=getattr(wid,'size',(100,100))
+                sh=getattr(wid,'size_hint',(1,1))
+                o=getattr(wid,'opacity',1)
+                d=getattr(wid,'disabled',False)
+            
+            setattr(wid,'size',s)
+            setattr(wid,'size_hint',sh)
+            setattr(wid,'opacity',o)
+            setattr(wid,'disabled',d)
+
+            for prop,v in enforce.items():
+                setattr(wid,prop,v)
 
 
 class MyApp(App):
@@ -1426,6 +1428,9 @@ class MyApp(App):
         do_auto_config=True,
         **kwargs
         ):
+        self._config={}
+        self._config_file=None
+
         if event_manager==None:
             event_manager=_event_manager
         if do_auto_config and not utils._did_auto_config:
@@ -1481,14 +1486,24 @@ class MyApp(App):
 
         if custom_titlebar:
             self.kvWindow.custom_titlebar=True
-            try:
-                first_el=layout[0][0]
-            except:
-                first_el=layout[0]
-            self.kvWindow.set_custom_titlebar(first_el)
-            tbw=self.kvWindow.titlebar_widget
-            if hasattr(tbw,'children'):
-                _ensure_bttn_not_draggable(tbw.children)
+            if custom_titlebar==True:
+                try:
+                    first_el=layout[0][0]
+                except:
+                    first_el=layout[0]
+                self.kvWindow.set_custom_titlebar(first_el)
+                tbw=self.kvWindow.titlebar_widget
+                if hasattr(tbw,'children'):
+                    _ensure_bttn_not_draggable(tbw.children)
+            else:
+                if custom_titlebar!=NOTKEY:
+                    def set_ctb(dt):
+                        self.kvWindow.set_custom_titlebar(self.ids[custom_titlebar])
+                        tbw=self.kvWindow.titlebar_widget
+                        if hasattr(tbw,'children'):
+                            _ensure_bttn_not_draggable(tbw.children)
+
+                    Clock.schedule_once(set_ctb)
             # layout.insert(0,[tbw])
 
 
@@ -1507,20 +1522,37 @@ class MyApp(App):
         # self.bind(on_stop=lambda *args: self.event_manager(self,'__Close__'))
 
         self._filebrowser={}
-        self._lock=None
+        self.lock_widget=None
 
         self._nk=0
-        class IDS(dict):
-            def __getattr__(self,name):
-                return self.__getitem__(name)
+        # class IDS(dict):
+        #     def __getattr__(self,name):
+        #         return self.__getitem__(name)
         # self.ids={}
-        self.ids=IDS()
+        self.ids=utils.IDS()
         # self.ids.__getattr__=types.MethodType(ids.__getitem__, ids)
         self._ids={}
         if not layout_class:
             rows=len(layout)
-            self._layout=kvw.GridLayoutB(rows=rows,**_preproces(**layout_args))
+            
+            # self._layout=kvw.GridLayoutB(rows=rows,**_preprocess(**layout_args))
+            
+            kvWd = kvw.GridLayoutB
+            if 'HAS_GRADIENT' in os.environ:
+                from SimpleKivy.kvGradient import GradientGrid
+                # class _kvWd_(GradientBehavior,kvWd):
+                #     pass
+                # kvWd=_kvWd_
+                kvWd=GradientGrid
+                # layout_args['over_class']=GradientBehavior
+                # kvWd=GradientBehavior,kvWd
+                # class _kvWd(GradientBehavior,kvWd):
+                #     pass
+                
+                
+                layout_args['gradient']=layout_args.get('gradient',['linear-gradient',dict(colors=['',''],size=[2,2])])
 
+            self._layout=skivify(kvWd,rows=rows,**layout_args)
             
             
             max_cols = 0
@@ -1553,9 +1585,22 @@ class MyApp(App):
                             Fill(),
                         )
         else:
-            self._layout=layout_class(**layout_args)
+            if 'HAS_GRADIENT' in os.environ:
+                if not hasattr(layout_class,'gradient'):
+                    from SimpleKivy.kvGradient import GradientBehavior
+                    layout_args['over_class']=GradientBehavior
+                    layout_args['gradient']=layout_args.get('gradient',['linear-gradient',dict(colors=['',''],size=[2,2])])
+            # print(layout_args)
+            # self._layout=layout_class(**layout_args)
+            # for kivy_el in layout:
+            #     self._layout.add_widget(kivy_el)
+            try:
+                self._layout=layout_class(**layout_args)
+            except:
+                self._layout=skivify(layout_class,**layout_args)
             for kivy_el in layout:
                 self._layout.add_widget(kivy_el)
+
 
         
         # if event_manager:
@@ -1579,6 +1624,7 @@ class MyApp(App):
         _future_process_elements(self)
         _post_process_elements(self)
         _future_process_binds(self)
+        _process_config_set(self) 
         # super(MyApp, self).__init__(**kwargs)
         self.paw=self.process_added_widgets
         self.Clock.schedule_once(lambda dt: setattr(self,'alpha',alpha))
@@ -1595,6 +1641,12 @@ class MyApp(App):
         # self.icon=icon
         # Clock.schedule_once(lambda dt: setattr(self,'icon',icon),1)
         Clock.schedule_once(lambda dt: self.on_icon(self,self.get_application_icon()))
+
+        ################################
+        # For MiniApp compatibility
+        kwargs.pop('k',None) 
+        kwargs.pop('size_hint',None) 
+        ################################
         super().__init__(icon=icon,**kwargs)
 
     @property
@@ -1779,8 +1831,10 @@ class MyApp(App):
 
     def thread_pool_new(self,name,max_workers=None):
         self.queue[name]=ThreadPoolExecutor(max_workers=max_workers,thread_name_prefix=name)
+        return self.queue[name]
     def queue_new(self,name):
         self.queue[name]=ThreadPoolExecutor(max_workers=1,thread_name_prefix=name)
+        return self.queue[name]
 
 
     def _set_alpha(self,*_):
@@ -1802,25 +1856,35 @@ class MyApp(App):
 
     def hide(self,*key_list,shrink=True):
         for k in key_list:
-            wid=self.__getitem__(k)
+            if isinstance(k,str):
+                wid=self.__getitem__(k)
+            else:
+                wid=k
             s=getattr(wid,'size',(100,100)).copy()
             sh=getattr(wid,'size_hint',(1,1)).copy()
             o=getattr(wid,'opacity',1)
             d=getattr(wid,'disabled',False)
+            # if o==0 and d==True:
+            #     return
             # print('hide:',(s,sh,o,d))
-            self.hidden[k]=(s,sh,o,d)
+
+            if k not in self.hidden:
+                self.hidden[k]=(s,sh,o,d)
             # print(self.hidden)
             # print(k,':',(s,sh,o,d))
             # setattr(w,'size')
             if shrink:
-                setattr(wid,'size',(0,0))
+                setattr(wid,'size',(1,1))
                 setattr(wid,'size_hint',(None,None))
             setattr(wid,'opacity',0)
             setattr(wid,'disabled',True)
             # print(self.hidden)
     def unhide(self,*key_list,enforce={}):
         for k in key_list:
-            wid=self.__getitem__(k)
+            if isinstance(k,str):
+                wid=self.__getitem__(k)
+            else:
+                wid=k
             try:
                 s,sh,o,d=self.hidden.get(k)
                 # print('unhide:',(s,sh,o,d))
@@ -1832,6 +1896,9 @@ class MyApp(App):
                 d=getattr(wid,'disabled',False)
             
             # print(k,':',(s,sh,o,d))
+
+            # if o==1 and d==False:
+            #     return
             
             setattr(wid,'size',s)
             setattr(wid,'size_hint',sh)
@@ -1970,9 +2037,11 @@ class MyApp(App):
         #         size_hint_x=1
         #     kw['width']=width
         # if is_large:
-        it=LargeText(
+        # it=LargeText(
+        it =Label(
             text=text,height=height,size_hint_y=size_hint_y,pos_hint=pos_hint,
             lcolor=lcolor,color=color,bcolor=bcolor,markup=markup,
+            font_size=font_size,
             # size_hint_x=size_hint_x,
             size_behavior=size_behavior,
             halign=halign,padding=padding,max_lines=max_lines,
@@ -2066,11 +2135,13 @@ class MyApp(App):
         _future_process_elements(self)
         _post_process_elements(self)
         _future_process_binds(self)
+        _process_config_set(self)
         return wid
     def process_added_widgets(self):
         _future_process_elements(self)
         _post_process_elements(self)
         _future_process_binds(self)
+        _process_config_set(self)
     # def trigger_call(self,k,prop=None,val=None,_kw_prepro=False,ignore_errors=False,**kwargs):
     #     return lambda dt: self.__call__(k=k,prop=prop,val=val,_kw_prepro=_kw_prepro,ignore_errors=ignore_errors,**kwargs)
     def dt_call(self,k,prop=None,val=None,_kw_prepro=False,ignore_errors=False,**kwargs):
@@ -2096,7 +2167,7 @@ class MyApp(App):
 
             if isinstance(prop,str):
                 if not _kw_prepro:
-                    kw=_preproces(**{prop:val})
+                    kw=_preprocess(**{prop:val})
                     trigger=Clock.create_trigger(lambda *args:setattr(widget,prop,kw[prop]),timeout)
                     trigger()
                 else:
@@ -2104,7 +2175,7 @@ class MyApp(App):
                     trigger()
             else:
                 # print(kwargs)
-                kwargs=_preproces(**kwargs)
+                kwargs=_preprocess(**kwargs)
                 for p,v in kwargs.items():
                     self.__call__(k,p,v,_kw_prepro=True)
                 # Clock.schedule_once(lambda dt:(setattr(self.ids[k],p,v) for p,v in kwargs.items()),timeout)
@@ -2292,50 +2363,170 @@ class MyApp(App):
         self._filebrowser[_k]=pop
         pop.open()
 
-    def popup_message(self,msg='message',title="Message",auto_dismiss=-1,**kw):
+    def popup_message(self,msg='message',title="Message",auto_dismiss=-1,dismiss_callback=None,size_hint=(.3,.3),**kw):
         pop=Popup(
             title=title,
             content=Label(msg,k=NOTKEY,**kw),
-            size_hint=(.3,.3),
+            size_hint=size_hint,
             k=NOTKEY)
         if auto_dismiss>0:
             pop.bind(on_open=lambda ins:Clock.schedule_once(ins.dismiss,auto_dismiss))
         def on_dismiss(ins):
             del ins
+            if dismiss_callback:
+                dismiss_callback()
         pop.bind(on_dismiss=on_dismiss)
         pop.open()
 
     def lock(self):
-        if not self._lock:
-            box=BoxitAngle(Label(mdi('dots-circle'),font_size=40,markup=True,k=NOTKEY),k=NOTKEY,
+        if not self.lock_widget:
+            lbl=Label(mdi('dots-circle'),
+                # focus_behavior=True,
+                # focus_map={},
+                # focus_color='',
+                font_size=80,markup=True,k=NOTKEY)
+            box=BoxitAngle(lbl,k=NOTKEY,
                 # bcolor='dark grey'
+                bcolor=[.1,.1,.1,.25]
                 )
-            def rotate_start(self,*args):
-                fps=1/30
-                self.rotate_stop()
-                Clock.schedule_interval(self.do_rotate,fps)
-            def rotate_stop(self,*args):
-                Clock.unschedule(self.do_rotate)
-            def do_rotate(self,dt):
-                self.angle=self.angle+5
-            box.do_rotate=types.MethodType(do_rotate,box)
-            box.rotate_start=types.MethodType(rotate_start,box)
-            box.rotate_stop=types.MethodType(rotate_stop,box)
+            box.lbl=lbl
+
+            from kivy.animation import Animation
+            box.animation=Animation(angle=359,duration=1.5,t='in_out_quad')
+            def on_complete(ani,wid):
+                # setattr(wid,'angle',0)
+                self.__call__(wid,angle=0)
+                if self._locked:
+                    Clock.schedule_once(lambda dt:wid.animation.start(wid))
+
+            box.animation.bind(on_complete=on_complete)
+
+            def rotate_start(ins,*x):
+                ins.lf=get_last_focused()
+                # print(ins.lf)
+                # if ins.lf:
+                #     if ins.lf.focus:
+                #         self.__call__(ins.lf,focus=False)
+                    # ins.lf.focus=False
+                # if ins.lf:
+                #     self.__call__(ins.box.lbl,focus=True)
+                    # Clock.schedule_once
+                # print(f"{ins.lf=}")
+                # print(ins.lf)
+                # ins.box.lbl.focus=True
+                # print('starting')
+                # ins.box.animation.cancel(ins.box)
+                ins.box.animation.start(ins.box)
+                self._locked=True
+                # Clock.schedule_once(lambda dt:ins.box.animation.start(ins.box))
+            def rotate_stop(ins,*x):
+                # if ins.lf and ins.lf==get_last_focused():
+                # if ins.lf:
+                #     if not ins.lf.focus:
+                #         self.__call__(ins.lf,focus=True)
+                    # ins.box.lbl.focus=False
+                    # ins.lf.focus=True
+                # if ins==get_last_focused():
+                #     utils.set_last_focused(ins.lf)
+
+                # ins.box.animation.cancel_all(ins.box,'angle')
+                ins.box.animation.cancel(ins.box)
+                # Clock.schedule_once(lambda dt:ins.box.animation.cancel(ins.box))
+                # Clock.schedule_once(lambda dt:setattr(ins.box,'angle',0))
+                
+                self._locked=False
+
+                self.__call__(ins.box,angle=0)
+                
+                
+                # if getattr(ins,'lf',None):
+                #     self.__call__(ins.box.lbl,focus=False)
+                #     self.__call__(ins.lf,focus=True)
+                
+                # Clock.schedule_once(lambda dt:ins.box.animation.cancel(ins.box))
+                # setattr(ins.box,'angle',0)
+                # 
+
+                # self.angle=0
+                # print('do cancel')
+            # def do_rotate(self,dt):
+            #     # print(self.angle)
+
+            #     self.angle=self.angle+5
+            #     if self._rotating:
+            #         Clock.schedule_once(self.do_rotate,self.fps)
+
+            # box.do_rotate=types.MethodType(do_rotate,box)
+            # box.rotate_start=types.MethodType(rotate_start,box)
+            # box.rotate_stop=types.MethodType(rotate_stop,box)
             
-            self._lock=ModalView(
-                # box,
+            # box.bind(angle=print)
+
+            def _gfocus_map(self):
+                pass
+                # return self.box.lbl.focus_map
+                # return self._actual_focus_map
+            def _sfocus_map(self,v):
+                # self._actual_focus_map = v
+                # self.box.lbl.focus_map=v
+                pass
+                return True
+            pfocus_map=property(_gfocus_map,_sfocus_map)
+            
+            pop=ModalView(
+                box,
                 auto_dismiss=False,
                 size_hint=(1,1),
                 background_color=[0,0,0,0],
                 k=NOTKEY,
-                background=''
-                # on_open=box.rotate_start,
-                # on_dismiss=box.rotate_stop,
+                background='',
+                # bind=dict(
+                #     on_pre_open=rotate_start,
+                #     on_dismiss=rotate_stop,
+                #     )
+                properties=dict(
+                    focus_map=pfocus_map,
+                    # on_key_down=print
+                    )
                 )
-        self._lock.open()
+            pop.box=box
+            
+            self.paw()
+
+            pop.bind(
+                on_pre_open=rotate_start,
+                on_pre_dismiss=rotate_stop,
+                )
+            self._locked=False
+            self.lock_widget=pop
+            
+
+            # self.lock_widget._actual_focus_map = {}
+            # self.lock_widget.__class__.focus_map=
+            # setattr(lbl.__class__,"focus_map",property(_gfocus_map,_sfocus_map))
+
+        # self._locked=True
+        # if not self._locked:
+        self.lock_widget.open()
+
+    def dt_lock(self,dt):
+        # if not self._locked:
+        self.lock()
+    def dt_unlock(self,dt):
+        # if self._locked:
+        self.unlock()
+
+    def is_locked(self):
+        return self._locked
+
     def unlock(self):
-        if self._lock:
-            self._lock.dismiss()
+        if self.lock_widget:
+            self.lock_widget.dismiss()
+        # self._locked=False
+    def lock_schedule_once(self):
+        Clock.schedule_once(self.dt_lock)
+    def unlock_schedule_once(self):
+        Clock.schedule_once(self.dt_unlock)
     
     @locked_screen
     def askopenfile(self,
@@ -2641,9 +2832,22 @@ class MyApp(App):
     #     return el
     def __getitem__(self, key):
         return self.ids[key]
+    # def __setitem__(self, key, value):
+    #     setattr(value,'id',key)
+    #     self.ids.__setitem__(key, value)
 
-    def schedule_get_call(self,key,method,*args,**kwargs):
-        Clock.schedule_once(lambda dt:getattr(self.ids[key],method)(*args,**kwargs))
+    def schedule_get_call(self,key,method,*args,timeout=0,**kwargs):
+        if isinstance(key,str):
+            wid=self.ids[key]
+        else:
+            wid=key
+        Clock.schedule_once(lambda dt:getattr(wid,method)(*args,**kwargs),timeout=timeout)
+    
+    def schedule_getattr_call(self,*args,**kwargs):
+        '''
+        Same as schedule_get_call.
+        '''
+        self.schedule_get_call(*args,**kwargs)
 
     # def __contains__(self, key):
     #     return self.ids.__contains__(key)
@@ -2665,18 +2869,33 @@ class MyApp(App):
     # def _callback_w_subev(self,*args,subevent=None,**kwargs):
     #     # print(args)
     #     ev=self._ids[args[0]]
-    #     self.event_manager(self,f"{ev}.{subevent}")
+    #     self.event_manager(self,f"{ev}.{getattr(args[0],'on_event',subevent)}")
+    def config_set(self,file):
+        self._config_file=file
+        if not os.path.exists(file):
+            self.config_dump()
+    def config_dump(self):
+        # if file==None and hasattr(self,'_config'):
+        #     file=self._config['file']
+        #     kwargs=self._config['kwargs']
+        if not self._config_file:
+            raise ValueError(f'Method MyApp.config_set has not been called first with a valid filename: "{self._config_file}"')
 
-    def config_dump(self,file,**kwargs):
+        
         data={}
-        for k,prop in kwargs.items():
-            val=getattr(self.__getitem__(k),prop)
-            data[k]=(prop,val)
-        pickle.dump(data,file=open(file,'wb'))
-    def config_load(self,file):
-        data=pickle.load(file=open(file,'rb'))
-        for k,v in data.items():
-            setattr(self.__getitem__(k),v[0],v[1])
+        for k,props in self._config.items():
+            data[k]={}
+            for prop in props:
+                data[k][prop]=getattr(self.ids[k],prop)
+        pickle.dump(data,file=open(self._config_file,'wb'))
+    def config_load(self):
+        if not self._config_file:
+            raise ValueError(f'Method MyApp.config_set has not been called first with a valid filename: "{self._config_file}"')
+
+        data=pickle.load(file=open(self._config_file,'rb'))
+        # print(data)
+        for k , props in data.items():
+            self.__call__(k,**props)
         return data
 
 
@@ -2751,18 +2970,21 @@ class MyApp(App):
             self.event_manager(self,'__Close__')
             self._leaving=True
             # time.sleep()
-    def sleep_in_thread(self,timeout=0):
+    def sleep_in_thread(self,timeout=0,dt=None):
         '''
         Similar to time.sleep, but returns if app._leaving == True.
         Usefull to exit quickly from a threaded task that uses sleep if the main app has closed.
         '''
         t0=time.time()
-        dt=1
-        if timeout<1:
-            dt=timeout/3
+        if dt==None:
+            dt=1
+            if timeout<1:
+                dt=timeout/3
+
         while True:
             # print('heree')
-            if time.time()-t0>=timeout:
+            ndt=time.time()-t0
+            if ndt>=timeout:
                 break
             if self._leaving:
                 break
@@ -2775,7 +2997,7 @@ def TEST_WIDGET(w,event_manager=None):
     MyApp(layout=lyt,event_manager=event_manager).run()
 
 @skwidget
-def Label(text='',k=None,focus_behavior=False,halign='center',size_behavior='normal',valign='middle',hover_highlight=False,**kwargs):
+def Label(text='',k=NOTKEY,focus_behavior=False,halign='center',size_behavior='normal',valign='middle',hover_highlight=False,**kwargs):
     '''
     Creates a Label widget dynamically with added functionalities.
 
@@ -2811,7 +3033,7 @@ def Label(text='',k=None,focus_behavior=False,halign='center',size_behavior='nor
     '''
 
 
-    # kwargs=_preproces(**kwargs)
+    # kwargs=_preprocess(**kwargs)
     # global _future_elements, _future_bind
     # print(kwargs)
     if focus_behavior:
@@ -3085,12 +3307,41 @@ def RstDocument(text='',k=None,enable_events=True,do_dot_subevent=True,on_event=
 def skivify_v2(class_,enable_events=False,on_event=None,do_dot_subevent=False,**kwargs):
     k=kwargs.pop('k',None)
 
+    do_dot_subevent=kwargs.pop('do_dot_subevent',do_dot_subevent)
+    enable_events=kwargs.pop('enable_events',enable_events)
+    on_event=kwargs.pop('on_event',on_event)
+    properties=kwargs.pop('properties',None)
+    over_class=kwargs.pop('over_class',())
+    
+    # print(f"{over_class = }")
     if isinstance(class_,(list,tuple)):
+        if over_class:
+            class_=list(class_)
+            if not isinstance(over_class,(list,tuple)):
+                over_class=[over_class]
+            class_=over_class+class_
+        # print(class_)
         class _class_(*class_):
             pass
         class_=_class_
+    else:
+        if over_class:
+            class_=[class_]
+            if not isinstance(over_class,(list,tuple)):
+                over_class=[over_class]
+            # class_.extend(over_class)
+            class_=over_class+class_
+            # over_class.extend(class_)
+            print(class_)
+            class _class_(*class_):
+                pass
+            class_=_class_
     
-    def widget_creator(**kwargs):
+    if properties:
+        for k,v in properties.items():
+            setattr(class_,k,v)
+
+    def widget_creator(enable_events,on_event,do_dot_subevent,**kwargs):
         kel=class_(**kwargs)
         kel.id=k
         if enable_events:
@@ -3098,7 +3349,7 @@ def skivify_v2(class_,enable_events=False,on_event=None,do_dot_subevent=False,**
             kel.on_event=on_event
             kel.do_dot_subevent=do_dot_subevent
         return kel
-    return widget_creator(**kwargs)
+    return widget_creator(enable_events,on_event,do_dot_subevent,**kwargs)
 skivify=skivify_v2
 # def extwidget_to_skwidget(class_,**kwargs):
 #     @skwidget
@@ -3107,10 +3358,15 @@ skivify=skivify_v2
 #     return _external_widget(**kwargs)
 
 def extwidget_to_skwidget(class_):
+    '''
+    Converts an external widget class into a Widget Creator Function (a SimpleKivy Widget).
+    Consider it as a convenience function to convert any widget compatible with kivy into a widget compatible with SimpleKivy, without adding extra functionalities besides args preprocessing and `k` (widget id) parameter.
+    '''
     @skwidget
     def _external_widget(**kwargs):
         return skivify_v2(class_,**kwargs)
     return _external_widget
+kivy2sk=extwidget_to_skwidget
 
 # def extwidget_class_to_skwidget_class(class_):
 #     @skwidget
@@ -3186,7 +3442,7 @@ def Camera(k=None,legacy=False,**kwargs):
     return kel
 
 @skwidget
-def Video(source='',k=None,**kwargs):
+def Video(source='',k=None,focus_behavior=False,**kwargs):
     '''
     Creates a Video widget dynamically with added functionalities.
 
@@ -3205,11 +3461,13 @@ def Video(source='',k=None,**kwargs):
     {base_params}
     '''
     from kivy.uix.video import Video as kvWd
-    kel=skivify_v2(kvWd,k=k,source=source,**kwargs)
+    if focus_behavior:
+        kvWd=kvb.FocusBehavior,kvWd
+    kel=skivify(kvWd,k=k,source=source,**kwargs)
     return kel
 
 @skwidget
-def VideoPlayer(source='',k=None,**kwargs):
+def VideoPlayer(source='',k=None,focus_behavior=False,**kwargs):
     '''
     Creates a VideoPlayer widget dynamically with added functionalities.
 
@@ -3228,7 +3486,9 @@ def VideoPlayer(source='',k=None,**kwargs):
     {base_params}
     '''
     from kivy.uix.videoplayer import VideoPlayer as kvWd
-    kel=skivify_v2(kvWd,k=k,source=source,**kwargs)
+    if focus_behavior:
+        kvWd=kvb.FocusBehavior,kvWd
+    kel=skivify(kvWd,k=k,source=source,**kwargs)
     return kel
 
 @skwidget
@@ -3803,7 +4063,7 @@ def AddSubMenu(main_widget,menu_widget,on_pre_open=None):
 
 
 @skwidget
-def ModalView(widgets=[],k=None,enable_events=False,on_event='on_pre_open',**kwargs):
+def ModalView(content=None,k=None,enable_events=False,on_event='on_pre_open',**kwargs):
     '''
     Creates and fills a ModalView widget dynamically with added functionalities.
 
@@ -3828,15 +4088,16 @@ def ModalView(widgets=[],k=None,enable_events=False,on_event='on_pre_open',**kwa
     '''
     from kivy.uix.modalview import ModalView as wid
     kel=skivify_v2(wid,k=k,enable_events=enable_events,on_event=on_event,**kwargs)
-    if isinstance(widgets,(list,tuple)):
-        for w in widgets:
+    if isinstance(content,(list,tuple)):
+        for w in content:
             # size_hint_y=getattr(w,'size_hint_y',None)
             # if size_hint_y!=None:
             #     w.size_hint_y=None
             #     w.height=44
             kel.add_widget(w)
     else:
-        kel.add_widget(widgets)
+        if content:
+            kel.add_widget(content)
     # kel.post='DropDown'
     return kel
 
@@ -3851,6 +4112,9 @@ def ComboBox(text='choice0',
     k=None,
     dark=False,
     flat=False,
+    bar_color=[.6, .6, .6, .9],
+    bar_inactive_color=[.6, .6, .6, .6],
+    bar_width=8,
     **kwargs):
     '''
     Creates a ComboBox widget (editable TextInput with a DropDown of values to choose from).
@@ -3919,7 +4183,7 @@ def ComboBox(text='choice0',
     {base_params}
     '''
 
-    dd=DropDown(k=NOTKEY)
+    dd=DropDown(k=NOTKEY,bar_color=bar_color,bar_width=bar_width,bar_inactive_color=bar_inactive_color)
     if flat:
         btn=FlatB(mdi('menu-down'),disabled=True,k=NOTKEY,font_size=20,markup=True,width=button_width,size_hint_x=None)
     else:
@@ -4054,7 +4318,7 @@ Calendar=DatePicker
 
 @skwidget
 def JoinLabel(texts=['text1','text2','text3'],k=None,focus_behavior=False,**kwargs):
-    # kwargs=_preproces(**kwargs)
+    # kwargs=_preprocess(**kwargs)
     # global _future_elements, _future_bind
     # print(kwargs)
     if focus_behavior:
@@ -4085,7 +4349,7 @@ T=Text=Label
 
 # @skwidget
 # def ScrollLabel(text='',k=None,focus_behavior=False,**kwargs):
-#     # kwargs=_preproces(**kwargs)
+#     # kwargs=_preprocess(**kwargs)
 #     # global _future_elements, _future_bind
 #     # print(kwargs)
 #     if focus_behavior:
@@ -4119,7 +4383,7 @@ def LargeText(text='',k=None,focus_behavior=False,
     shorten_from='right',
     size_behavior='normal',
     **kwargs):
-    # kwargs=_preproces(**kwargs)
+    # kwargs=_preprocess(**kwargs)
     # global _future_elements, _future_bind
     if focus_behavior:
         kvWd=kvw.FocusLabelB
@@ -4163,7 +4427,7 @@ def LargeText(text='',k=None,focus_behavior=False,
     return kel
 
 @skwidget
-def Boxit(*widgets,k=None,base_cls=None,**kwargs):
+def Boxit(*widgets,k=NOTKEY,base_cls=None,**kwargs):
     '''
     Dynamic layout constructor. The type of layout is specified by `base_cls`.
 
@@ -4189,7 +4453,7 @@ def Boxit(*widgets,k=None,base_cls=None,**kwargs):
 
     {base_params}
     '''
-    # kwargs=_preproces(**kwargs)
+    # kwargs=_preprocess(**kwargs)
     if base_cls==None:
         kvWd=kvw.BoxLayoutB
     else:
@@ -4214,7 +4478,7 @@ def Splitter(widget=None,k=None,sizable_from = 'right',**kwargs):
     return kel
 
 @skwidget
-def BoxitH(*widgets,k=None,orientation='horizontal',**kwargs):
+def BoxitH(*widgets,k=NOTKEY,orientation='horizontal',**kwargs):
     '''
     Dynamic `BoxLayout` constructor with `orientation = "horizontal"` set as default.
 
@@ -4237,7 +4501,7 @@ def BoxitH(*widgets,k=None,orientation='horizontal',**kwargs):
     {base_params}
     '''
 
-    # kwargs=_preproces(**kwargs)
+    # kwargs=_preprocess(**kwargs)
     kel=skivify_v2(kvw.BoxLayoutB,k=k,orientation=orientation,**kwargs)
 
     # kel.id=k
@@ -4248,6 +4512,68 @@ def BoxitH(*widgets,k=None,orientation='horizontal',**kwargs):
     
     setattr(kel,'_isbox',kel.orientation)
     # _future_elements.append(kel)
+    return kel
+
+@skwidget
+def GradientBoxit(*widgets,gradient=["linear-gradient",dict(colors=['#0E0A0A','#E87322'])],orientation='horizontal',k=NOTKEY,**kwargs):
+    '''
+    Dynamic `BoxLayout` constructor with `orientation = "horizontal"` set as default.
+
+    ## Parameters
+    
+    {widgets}
+
+    {common}
+
+    {bgline}
+
+    ## Returns
+    
+    `BoxLayout` created dynamically with `*widgets` added as children during creation.
+
+    ## Kivy Bases
+    
+    `BoxLayout`
+
+    {base_params}
+    '''
+    from .kvGradient import GradientBox as kvWd
+    kel=skivify(kvWd,gradient=gradient,k=k,orientation=orientation,**kwargs)
+
+    for w in widgets:
+        kel.add_widget(w)
+    setattr(kel,'_isbox',kel.orientation)
+    return kel
+
+@skwidget
+def GradientBoxitV(*widgets,gradient=["linear-gradient",dict(colors=['#0E0A0A','#E87322'])],orientation='vertical',k=NOTKEY,**kwargs):
+    '''
+    Dynamic `BoxLayout` constructor with `orientation = "horizontal"` set as default.
+
+    ## Parameters
+    
+    {widgets}
+
+    {common}
+
+    {bgline}
+
+    ## Returns
+    
+    `BoxLayout` created dynamically with `*widgets` added as children during creation.
+
+    ## Kivy Bases
+    
+    `BoxLayout`
+
+    {base_params}
+    '''
+    from .kvGradient import GradientBox as kvWd
+    kel=skivify(kvWd,gradient=gradient,k=k,orientation=orientation,**kwargs)
+
+    for w in widgets:
+        kel.add_widget(w)
+    setattr(kel,'_isbox',kel.orientation)
     return kel
 
 @skwidget
@@ -4287,7 +4613,7 @@ def Frame(title='Frame',*widgets,k=None,orientation='vertical',
     {base_params}
     '''
 
-    # kwargs=_preproces(**kwargs)
+    # kwargs=_preprocess(**kwargs)
     lcolor=kwargs.pop('lcolor',[.5,.5,.5,1])
     lwidth=kwargs.pop('lwidth',1)
     class kvWd(kvw.RelativeLayout):
@@ -4299,7 +4625,7 @@ def Frame(title='Frame',*widgets,k=None,orientation='vertical',
         def __init__(self, **kwargs):
             # kwargs['bcolor']=resolve_color(kwargs.get('bcolor',self.bcolor))
             # kwargs['lcolor']=resolve_color(kwargs.get('lcolor',self.lcolor))
-            print(self.lcolor)
+            # print(self.lcolor)
             super(kvWd, self).__init__(**kwargs)
 
             Clock.schedule_once(self._init)
@@ -4318,21 +4644,24 @@ def Frame(title='Frame',*widgets,k=None,orientation='vertical',
             self.line.width = value
 
         def _update_canvas(self, *args):
-            self.box.size_hint=(None,None)
-            self.box.width=self.width-self.lbl.height
-            self.box.height=self.height-self.lbl.height-self.lbl.height/2
-            self.box.x=self.lbl.height/2
-            self.box.y=self.lbl.height/2
-            # self.box.pos=self.to_parent(self.lbl.height/2,self.lbl.height/2)
+            try:
+                self.box.size_hint=(None,None)
+                self.box.width=self.width-self.lbl.height
+                self.box.height=self.height-self.lbl.height-self.lbl.height/2
+                self.box.x=self.lbl.height/2
+                self.box.y=self.lbl.height/2
+                # self.box.pos=self.to_parent(self.lbl.height/2,self.lbl.height/2)
 
-            self.line.points=[
-                    *self.to_parent(self.lbl.x+self.lbl.width, self.height-self.lbl.height/2),
-                    *self.to_parent(self.width, self.height-self.lbl.height/2),
-                    *self.to_parent(self.width, 0),
-                    *self.to_parent(0, 0),
-                    *self.to_parent(0, self.height-self.lbl.height/2),
-                    *self.to_parent(self.lbl.x, self.height-self.lbl.height/2),
-                    ]
+                self.line.points=[
+                        *self.to_parent(self.lbl.x+self.lbl.width, self.height-self.lbl.height/2),
+                        *self.to_parent(self.width, self.height-self.lbl.height/2),
+                        *self.to_parent(self.width, 0),
+                        *self.to_parent(0, 0),
+                        *self.to_parent(0, self.height-self.lbl.height/2),
+                        *self.to_parent(self.lbl.x, self.height-self.lbl.height/2),
+                        ]
+            except:
+                pass
         def _init(self,dt):
             self.box.size_hint=(None,None)
             self.box.width=self.width-self.lbl.height
@@ -4421,7 +4750,7 @@ def Frame(title='Frame',*widgets,k=None,orientation='vertical',
     return kel
 
 @skwidget
-def LabelCheck(text='checkbox',halign='left',valign='middle',enable_events=False,on_event='active',cwidth=40,active=False,k=None,**kwargs):
+def LabelCheck(text='checkbox',active=False,halign='left',valign='middle',enable_events=False,on_event='active',cwidth=40,k=None,**kwargs):
     '''
     Creates a LabelCheck widget dynamically with added functionalities.
 
@@ -4489,7 +4818,7 @@ def HoverBoxit(*widgets,k=None,enable_events=True,hover_highlight=False,do_dot_s
     {when_hover_highlight}
     '''
 
-    # kwargs=_preproces(**kwargs)
+    # kwargs=_preprocess(**kwargs)
     # kvWd=kvw.BoxLayoutB
     if hover_highlight:
         class kvWd(kvb.HoverHighlightBehavior,kvw.BoxLayoutB):
@@ -4514,9 +4843,9 @@ def HoverBoxit(*widgets,k=None,enable_events=True,hover_highlight=False,do_dot_s
     return kel
 
 @skwidget
-def Grid(layout=[[]],k=None,navigation_behavior=False,**kwargs):
+def Grid(layout=[[]],k=NOTKEY,navigation_behavior=False,**kwargs):
     '''
-    Dynamic `BoxLayout` constructor.
+    Dynamic `GridLayout` constructor.
 
     ## Dynamic Creation Parameters
     
@@ -4540,7 +4869,7 @@ def Grid(layout=[[]],k=None,navigation_behavior=False,**kwargs):
 
     {base_params}
     '''
-    # kwargs=_preproces(**kwargs)
+    # kwargs=_preprocess(**kwargs)
 
     
     if navigation_behavior:
@@ -4589,6 +4918,77 @@ def Grid(layout=[[]],k=None,navigation_behavior=False,**kwargs):
 
 
     # _future_elements.append(kel)
+
+    setattr(kel,'_isbox','grid')
+
+    return kel
+
+@skwidget
+def GradientGrid(layout=[[]],k=NOTKEY,navigation_behavior=False,**kwargs):
+    '''
+    Dynamic `GridLayout` constructor.
+
+    ## Dynamic Creation Parameters
+    
+    {grid_navigation_behavior}
+
+    ## Parameters
+    
+    {layout}
+
+    {common}
+
+    {bgline}
+
+    ## Returns
+    
+    `GridLayout` created dynamically with `layout` widgets added as children during creation.
+
+    ## Kivy Bases
+    
+    `GridLayout`
+
+    {base_params}
+    '''
+    # kwargs=_preprocess(**kwargs)
+
+    from .kvGradient import GradientGrid as kvGradientGrid
+    if navigation_behavior:
+        class kvWd(kvGradientGrid,kvb.GridNavigationBehavior):
+            pass
+    else:
+        kvWd=kvw.kvGradientGrid
+    
+
+    rows=len(layout)
+    
+    kel=skivify_v2(kvWd,k=k,rows=rows,**kwargs)
+    
+    # if not 'nrows' in kwargs and not 'ncols' in kwargs:
+    max_cols = 0
+    for row in layout:
+        if len(row) > max_cols:
+            max_cols = len(row)
+    i=0
+    for row in layout:
+        i += 1
+        elnum = -1
+        for el in row:
+            elnum += 1
+            kivy_el = el
+            kel.add_widget(kivy_el)
+
+        lenrow = len(row)
+        addnvoids = 0
+        if lenrow < max_cols:
+            addnvoids = max_cols - lenrow
+        for v in range(addnvoids):
+            kel.add_widget(
+                        Fill()
+                )
+
+    setattr(kel,'_isbox','grid')
+
     return kel
 
 _web_started=False
@@ -4787,7 +5187,7 @@ def WebView(url="https://www.google.com",k=None,
 #     return kel
 
 @skwidget
-def External(title="External window title",hwnd=None,k=None,
+def External(title="",hwnd=None,k=None,
     **kwargs):
     '''
     Attaches an external window to the current kivy window. It's like runing your program alongside another program.
@@ -4844,12 +5244,20 @@ def External(title="External window title",hwnd=None,k=None,
             self.thread.name='MainThread'
             self.thread.daemon = True
             self.thread.start()
+        def attach(self,hwnd=None,title=None):
+            self.hwnd=hwnd
+            self.title=title
         def _attach(self):
+            _app=App.get_running_app()
+            while not self.hwnd and not self.title:
+                _app.sleep_in_thread(1/30)
             if self.hwnd==None:
                 self.hwnd=find_hwnd_by_title(self.title)
+
+            print('attaching:',self.hwnd)
             
             self.ewin = ExternalWindow(self.hwnd)
-            _app=App.get_running_app()
+            
             self._app=_app
             self.ewin.set_parent(_app.hwnd)
             set_constant_window_colors(self._app.hwnd)
@@ -5005,7 +5413,7 @@ def Titlebar(k='titlebar',padding=[4,4],orientation='horizontal',**kwargs):
     '''
 
     # size=kwargs.pop('size','y32')
-    kwargs=_preproces(**kwargs)
+    kwargs=_preprocess(**kwargs)
     kel=skivify(kvw.BoxLayoutB,k=k,orientation=orientation,padding=padding,**kwargs)
 
     # kel.id=k
@@ -5088,7 +5496,7 @@ def Pageit(*widgets,k=None,**kwargs):
         kel.add_widget(w)
     return kel
 @skwidget
-def BoxitV(*widgets,k=None,orientation='vertical',**kwargs):
+def BoxitV(*widgets,k=NOTKEY,orientation='vertical',**kwargs):
     '''
     Dynamic `BoxLayout` constructor with `orientation = "vertical"` set as default.
 
@@ -5151,7 +5559,7 @@ def Stackit(*widgets,k=None,orientation='lr-tb',**kwargs):
     return kel
 
 @skwidget
-def Relativeit(*widgets,k=None,**kwargs):
+def Relativeit(*widgets,k=NOTKEY,**kwargs):
     '''
     Dynamic `RelativeLayout` constructor.
 
@@ -5178,9 +5586,38 @@ def Relativeit(*widgets,k=None,**kwargs):
     for w in widgets:
         kel.add_widget(w,index=-1)
     return kel
+@skwidget
+def GradientRelativeit(*widgets,k=NOTKEY,**kwargs):
+    '''
+    Dynamic `RelativeLayout` constructor.
+
+    ## Parameters
+    
+    {widgets}
+
+    {common}
+
+    {bgline}
+
+    ## Returns
+    
+    `RelativeLayout` created dynamically with `*widgets` added as children during creation.
+
+    ## Kivy Bases
+    
+    `RelativeLayout`
+
+    {base_params}
+    '''
+    from .kvGradient import GradientRelative as kvWd
+    kel=skivify_v2(kvWd,k=k,**kwargs)
+
+    for w in widgets:
+        kel.add_widget(w,index=-1)
+    return kel
 
 @skwidget
-def Floatit(*widgets,k=None,**kwargs):
+def Floatit(*widgets,k=NOTKEY,**kwargs):
     '''
     Dynamic `FloatLayout` constructor.
 
@@ -5329,7 +5766,7 @@ def RoundButtonRelativeit(*widgets,k=None,enable_events=True,on_event='on_releas
 #     return kel
 
 @skwidget
-def Scatterit(*widgets,k=None,**kwargs):
+def Scatterit(*widgets,k=NOTKEY,**kwargs):
     '''
     Dynamic `ScatterLayout` constructor.
 
@@ -5349,7 +5786,7 @@ def Scatterit(*widgets,k=None,**kwargs):
 
     {base_params}
     '''
-    # kwargs=_preproces(**kwargs)
+    # kwargs=_preprocess(**kwargs)
 
     from kivy.uix.scatterlayout import ScatterLayout as kvWd
 
@@ -5363,10 +5800,49 @@ def Scatterit(*widgets,k=None,**kwargs):
 # Scatterit=Boxit_scatter
 
 @skwidget
-def ButtonBoxitAngle(*widgets,k=None,angle=0,enable_events=True,on_event="on_release",**kwargs):
-    # kwargs=_preproces(**kwargs)
+def ButtonBoxitAngle(*widgets,k=None,angle=0,enable_events=True,on_event="on_release",focus_behavior=False,**kwargs):
+    '''
+    Creates a `WIDGET` widget with `ButtonBehavior` and rotated contents dynamically with added functionalities.
+
+    ## Dynamic Creation Parameters
+
+    {focus_behavior}
+    > Default is False.
+    
+
+    ## Parameters
+
+    `angle (int or float)`: Angle of rotation of the box contents. Defaults to 0.
+    
+    {bgline_state}
+
+    {common}
+
+    ## Returns
+    
+    `WIDGET` widget created dynamically.
+
+    ## Kivy Bases
+    
+    `BoxLayout`
+
+    {base_params}
+    
+    ## Properties
+
+    {button_properties}
+
+    ## Events
+    
+    {events_button}
+    '''
 
     kvWd=kvw.AngleBBoxLayout
+
+    if focus_behavior:
+        class nkvWd(kvb.FocusBehavior,kvWd):
+            pass
+        kvWd=nkvWd
 
     kel=skivify_v2(kvWd,k=k,angle=angle,enable_events=True,on_event=on_event,**kwargs)
 
@@ -5382,12 +5858,12 @@ def ButtonBoxitAngle(*widgets,k=None,angle=0,enable_events=True,on_event="on_rel
 # ButtonBoxitAngle=Boxit_angle_bbox
 
 @skwidget
-def BoxitAngle(*widgets,k=None,angle=0,enable_events=True,on_event="on_release",**kwargs):
-    # kwargs=_preproces(**kwargs)
+def BoxitAngle(*widgets,k=NOTKEY,angle=0,enable_events=False,on_event="on_release",**kwargs):
+    # kwargs=_preprocess(**kwargs)
 
     kvWd=kvw.AngleBoxLayout
 
-    kel=skivify_v2(kvWd,k=k,angle=angle,enable_events=True,on_event=on_event,**kwargs)
+    kel=skivify_v2(kvWd,k=k,angle=angle,enable_events=enable_events,on_event=on_event,**kwargs)
 
     for w in widgets:
         kel.add_widget(w)
@@ -5399,8 +5875,8 @@ def BoxitAngle(*widgets,k=None,angle=0,enable_events=True,on_event="on_release",
     return kel
 
 @skwidget
-def StripLayout(*widgets,k=None,rows=1,**kwargs):
-    # kwargs=_preproces(**kwargs)
+def StripLayout(*widgets,k=NOTKEY,rows=1,**kwargs):
+    # kwargs=_preprocess(**kwargs)
 
     # kvWd=kvw.AngleBBoxLayout
     from kivy.uix.tabbedpanel import StripLayout as kvWd
@@ -5419,7 +5895,7 @@ def StripLayout(*widgets,k=None,rows=1,**kwargs):
 
 @skwidget
 def Scatter(widget,k=None,**kwargs):
-    # kwargs=_preproces(**kwargs)
+    # kwargs=_preprocess(**kwargs)
 
     # from kivy.uix.scatter import Scatter as kvWd
 
@@ -5759,7 +6235,7 @@ def Tab(
     {base_params}
     '''
 
-    # kwargs=_preproces(**kwargs)
+    # kwargs=_preprocess(**kwargs)
     # global _future_elements, _future_bind
     class kvWd(kvw.TabbedPanel):
         _panels={}
@@ -5789,7 +6265,7 @@ def Tab(
     return kel
 
 # def Button(text='button',enable_events=True,k=None,on_event='on_release', **kwargs):
-#     kwargs=_preproces(**kwargs)
+#     kwargs=_preprocess(**kwargs)
 #     global _future_elements, _future_bind
 #     kel=kvw.kvButton(text=text,**kwargs)
     
@@ -6005,6 +6481,16 @@ def Image(
     is_svg=False,
     **kwargs
     ):
+    '''
+    `WIDGET` widget created Dynamically
+
+    ## Parameters
+
+    `fit_mode: str`
+    > Distribution of the image within the widget. Has to be one of `"scale-down", "fill", "contain", "cover"`
+    > Defaults to `"contain"`.
+
+    '''
     if source and not is_svg:
         is_svg=os.path.splitext(source)[-1].lower()=='.svg'
     if async_load:
@@ -6014,6 +6500,7 @@ def Image(
         # from kivy.uix.image import Image as kvImage
         kvImage=mkvw.Image
 
+    
     if copypaste:
         _kvImage=kvImage
         Logger.info('SimpleKivy: importing "pyperclip", "requests", "io.BytesIO", "kivy.core.image.Image", "kivy.core.clipboard.Clipboard", "PIL.ImageGrab" and "PIL.Image" to support image clipboard manipulation.')
@@ -6068,6 +6555,7 @@ def Image(
                     pilimg.save(data, format='png')
                     data.seek(0) # yes you actually need this
                     self.texture=CoreImage(BytesIO(data.read()), ext='png').texture
+                    # Clock.schedule_once(lambda dt:setattr(self,'texture',CoreImage(BytesIO(data.read()), ext='png').texture))
                 return pilimg
                 
             def copy(self):
@@ -6079,7 +6567,8 @@ def Image(
                     # nimg=nimg.convert('RGBA')
                     pci.copy(nimg)
                     # print("copied from here")
-                    return nimg
+                    return nim
+
             def paste_from_path(self,path):
                 cimg=CoreImage(path)
                 if cimg:
@@ -6118,20 +6607,26 @@ def Image(
                 # if not source:
                 #     self.texture=None
                 #     return
+                tried_normal=False
                 try:
-                    self.from_bytes(
-                            svg2png(
-                                url=ins.source,
-                                output_width=ins.width,
-                                output_height=ins.height,
-                                parent_width=ins.width,
-                                parent_height=ins.height,
+                    if pathlib.Path(src).suffix.lower()=='.svg':
+                        self.from_bytes(
+                                svg2png(
+                                    url=src,
+                                    output_width=ins.width,
+                                    output_height=ins.height,
+                                    parent_width=ins.width,
+                                    parent_height=ins.height,
+                                )
                             )
-                        )
+                    else:
+                        tried_normal=True
+                        super()._load_source(ins,src)
+
                 except Exception as error:
                     self.dispatch('on_error', error)
                     sup=super()
-                    if hasattr(sup,'_load_source'):
+                    if not tried_normal and hasattr(sup,'_load_source'):
                         sup._load_source(ins,ins.source)
             def on_error(self,error):
                 pass
@@ -6142,7 +6637,7 @@ def Image(
 
 
     # if fit_mode!='full':
-    kel=kvImage(
+    kel=skivify(kvImage,
         source=source,
         anim_delay=anim_delay,
         fit_mode=fit_mode,
@@ -6173,9 +6668,1107 @@ def Image(
 
     return kel
 
+@skwidget
+def VideoVLC(
+    source='',
+    k=None,
+    fit_mode='contain', # scale-down, fill, contain, cover,
+    focus_behavior=False,
+    allow_stretch=True,
+    lock_screen_on_buffer=False,
+    **kwargs,
+    ):
+    from kivy.graphics.texture import Texture
+    from kivy.core.image import Image as CoreImage
+    import numpy as np
+    import vlc
+    class _VLCWidget(mkvw.Image):
+        _state = kvw.OptionProperty('stop', options=('play', 'pause', 'stop'))
+        player=kvw.ObjectProperty(None)
+        _eos = kvw.BooleanProperty(False)
+        loaded=kvw.BooleanProperty(None)
+        # allow_stretch=kvw.BooleanProperty(True)
+        lock_screen_on_buffer=kvw.BooleanProperty(False)
+        filename=StringProperty(None)
+
+        _preview=kvw.StringProperty(resource_find( 'skdata/0.png'))
+        
+        def _gsource(self):
+            return self.filename
+            # try:
+            #     # return self.media.get_mrl()
+            #     return self.filename
+            # except:
+            #     return None
+        
+        
+
+        
+        def load_stream_async(self, stream_url: str, ready_callback=None, 
+                         error_callback = None):
+            """
+            Load a stream asynchronously and call the callback when ready.
+            
+            Args:
+                stream_url: URL of the stream to load
+                ready_callback: Function to call when stream is ready to play
+                error_callback: Optional function to call if loading fails
+            """
+            if self.is_loading:
+                if error_callback:
+                    error_callback("Already loading a stream")
+                return
+            import threading
+            if ready_callback==None:
+                ready_callback = lambda *x:print('Loaded successfully!')
+
+            self.should_cancel = False
+            self.is_loading = True
+            self.loaded=False
+
+            
+            def load_task(stream_url):
+                try:
+                    
+                    
+                    sresolver=getattr(self,'source_resolver',None)
+                    if sresolver:
+                        try:
+                            # if stream_url in self._resolved:
+                            #     stream_url=self._resolved[stream_url]
+                            # else:
+                            stream_url=self._resolved.get(stream_url,sresolver(stream_url)) 
+                        except Exception as error:
+                            traceback.print_exc()
+                            raise error
+                    # Create new media
+                    # print(f"{stream_url = }")
+                    self.media = self.instance.media_new(stream_url)
+                    self.filename=stream_url
+                    self.player.set_media(self.media)
+
+                    Clock.schedule_once(lambda dt:self.dispatch('on_media_parse_start',self.media))
+                    
+                    # Add event manager to detect when media is parsed
+                    # event_manager = self.media.event_manager()
+                    # event_manager.event_attach(vlc.EventType.MediaParsedChanged, 
+                    #                          # lambda event: self._on_media_parsed(event, ready_callback)
+                    #                          self._on_media_parsed,
+                    #                          ready_callback
+                    #                          )
+                    
+                    # Start parsing the media (this happens asynchronously in VLC)
+                    # self.media.parse_with_options(vlc.MediaParseFlag.network, 10000)
+                    # self.media.parse_with_options(vlc.MediaParseFlag.network, 10000)
+
+                    self.media.parse_async()
+                    timeout=10 # s
+                    tend=time.time()+timeout
+
+                    # print('loading...')
+                    
+                    # Monitor for cancellation while parsing
+                    # while (not self.should_cancel and 
+                    #        self.media.get_parsed_status() == vlc.MediaParsedStatus.init):
+
+                    
+                    while not self.should_cancel:
+                        pstat=self.media.get_parsed_status()
+                        # print('loading...',pstat)
+                        if pstat in self._parse_success:
+                            self.media.parse_stop()
+                            # self.dispatch('on_media_parsed')
+                            # Clock.schedule_once(lambda dt:self.dispatch('on_media_parsed',self.media) )
+                            Clock.schedule_once(lambda dt:self._on_media_parsed(self.media))
+                            # self.dispatch('on_media_parsed',self.media)
+                            return
+                        elif pstat in self._parse_unknown:
+                            Clock.schedule_once(get_kvApp().dt_lock)
+                            self.player.play()
+                            video_track=-1
+                            while video_track==-1:
+                                video_track=self.player.video_get_track()
+                                # print(f"{video_track = }")
+                                if time.time()>=tend:
+                                    raise TimeoutError(f'Could not parse the stream "{stream_url}" before timeout {timeout} s')
+                                time.sleep(self.spf)
+                            self.player.stop()
+                            Clock.schedule_once(get_kvApp().dt_unlock)
+                            Clock.schedule_once(lambda dt:self._on_media_parsed(self.media))
+                            return
+                        elif pstat in self._parse_error:
+                            raise FileNotFoundError(f'Could not parse the stream "{stream_url}"')
+                        if time.time()>=tend:
+                            raise TimeoutError(f'Could not parse the stream "{stream_url}" before timeout {timeout} s')
+                        time.sleep(self.spf)
+                    # print(f"{should_cancel = }")
+
+                    if self.should_cancel:
+                        self.media.parse_stop()
+                        Clock.schedule_once(lambda dt:self._on_media_parse_cancel(self.media))
+                        return
+                    # elif pstat==vlc.MediaParsedStatus.done:
+                    #     # Clock.schedule_once(lambda dt:self._update_frame_format())
+                    #     self.dispatch('on_media_parsed')
+                        
+                except Exception as e:
+                    Clock.schedule_once(lambda dt:self._on_media_parse_error(getattr(self,"media",None)))
+                    return
+                    # self.is_loading = False
+                    # if error_callback:
+                    #     error_callback(f"Loading failed: {str(e)}")
+                        
+            self.load_thread = threading.Thread(target=load_task,args=(stream_url,), daemon=True)
+            self.load_thread.start()
+            return self.load_thread
+        
+        def _on_media_parsed(self,media):
+            self._update_frame_format()
+            self.is_loading = False
+            self.loaded=True
+            self.dispatch('on_media_parsed',media)
+            # ready_callback()
+        
+        def _on_media_parse_cancel(self,media):
+            self._cleanup()
+            self.dispatch('on_media_parse_cancel',media)
+        
+        def _on_media_parse_error(self,media):
+            self._cleanup()
+            self.dispatch('on_media_parse_error',media)
+        
+        def on_media_parse_start(self,media):
+            pass
+        
+        def on_media_parsed(self,media):
+            pass
+        
+        def on_media_parse_error(self,media):
+            pass
+        
+        def on_media_parse_cancel(self,media):
+            pass
+        # def _on_media_parsed(self, event,ready_callback):
+        #     pstat=self.media.get_parsed_status()
+        #     # print('Media parsed state:',pstat)
+        # # def _on_media_parsed(self, event, ready_callback):
+        #     """Called when VLC has finished parsing the media"""
+        #     # print(event,ready_callback)
+        #     if self.should_cancel:
+        #         return
+                
+        #     if pstat == vlc.MediaParsedStatus.done:
+        #         self.is_loading = False
+        #         self.loaded=True
+        #         ready_callback()
+        
+        def _cleanup(self):
+            """Clean up resources after cancellation"""
+            if self.media:
+                self.media.release()
+                self.media = None
+            self.player.stop()
+            self.is_loading = False
+        
+        def cancel_media_parse(self):
+            """Cancel the ongoing stream loading"""
+            if self.is_loading:
+                self.should_cancel = True
+                if self.load_thread and self.load_thread.is_alive():
+                    self.load_thread.join(timeout=2.0)
+                # print('loading cancelled!')
+        
+        def _ssource(self,val):
+            self.player.stop()
+            if not self._callbacks_set:
+                Clock.schedule_once(lambda dt:self._setup_vlc_callbacks())
+            if val:
+                if not self.load_stream_async(val,ready_callback=self._update_frame_format):
+                    return False
+                else:
+                    return True
+            else:
+                return False
+
+            return False
+
+        # def _ssource(self,val):
+        #     self.loaded=False
+        #     if not val:
+        #         return False
+        #     self.player.stop()
+        #     self.media = self.instance.media_new(val)
+        #     self.player.set_media(self.media)
+        #     self.filename=val
+        #     self._update_frame_format()
+        #     if not self._callbacks_set:
+        #         Clock.schedule_once(lambda dt:self._setup_vlc_callbacks())
+
+        #     self.loaded=True
+
+        #     return True
+
+        source=kvw.AliasProperty(_gsource,_ssource,bind=['filename',])
+
+        
+
+        _duration=kvw.NumericProperty(-1)
+        _position=kvw.NumericProperty(-1)
+        
+        def texture_update(self,*largs):
+            pass
+
+        def __init__(self,**kwargs):
+            self._resolved={}
+            self.register_event_type('on_media_parse_start')
+            self.register_event_type('on_media_parsed')
+            self.register_event_type('on_media_parse_cancel')
+            self.register_event_type('on_media_parse_error')
+            self.spf=1/30
+            self._states={
+                vlc.State.Playing:'play',
+                vlc.State.Paused:'pause',
+                vlc.State.Stopped:'stop',
+                vlc.State.Ended:'stop',
+                }
+            self._parse_success={vlc.MediaParsedStatus.done}
+            self._parse_unknown={vlc.MediaParsedStatus.skipped}
+            self._parse_error={vlc.MediaParsedStatus.failed,vlc.MediaParsedStatus.timeout}
+            self.load_thread = None
+            self.should_cancel = False
+            self.is_loading = False
+
+            # self._preview=resource_find( 'skdata/0.png')
+            _preview=kwargs.pop('preview',resource_find( 'skdata/0.png'))
+            # self._filename=None
+            self._callbacks_set=False
+            self.frame_width=1280
+            self.frame_height=720
+            self.frame_pitch = self.frame_width * 4  # RGBA
+
+            self._frame = np.zeros((self.frame_height, self.frame_width, 4), dtype=np.uint8)
+
+            # VLC setup
+            self.instance = vlc.Instance(
+                # "--no-audio"
+                "--vout=dummy",
+                "--no-video-on-top",
+                # "--qt-start-minimized",
+                # "-avcodec-hw=any",
+                "--directx-hw-yuv",
+                # "--direct3d11-hw-blending",
+
+                )  # or enable audio if needed
+            
+            self.player = self.instance.media_player_new()
+            self.media = None
+            self.em=self.player.event_manager()
+            self.em_init()
+            self.player.audio_set_volume(100)
+
+            
+            # print(self.source)
+            # Texture placeholder
+            
+            super().__init__(preview=_preview,**kwargs)
+
+            # self.bind(
+            #     size=lambda *x:self.__update_frame_format()
+            #     )
+
+            # self._update_frame_format()
+            # self.texture = Texture.create(size=(self.frame_width, self.frame_height))
+            # self.texture.flip_vertical()
+
+            # self.funbind('source',self.texture_update)
+            # self.fbind('source', self._trigger_video_load)
+            # self.fbind('state', self.on_state)
+
+            # Clock.schedule_once(self._init_props)
+            
+            # Start playback
+            # self.player.play()
+
+
+        
+        def _init_props(self,dt):
+            self.setter('source')(self,self.source)
+            self.setter('state')(self,self.state)
+        # def __update_frame_format(self):
+        #     vwidth_val=self.player.video_get_width()
+        #     vheight_val = self.player.video_get_height()
+
+        #     width_val=round(self.width)
+        #     height_val=round(self.height)
+
+        #     self.frame_width=width_val
+        #     self.frame_height = height_val
+        #     self.frame_pitch = self.frame_width * 4  # RGBA
+        #     self._frame = np.zeros((self.frame_height, self.frame_width, 4), dtype=np.uint8)
+
+        #     # Texture placeholder
+        #     self.texture = Texture.create(size=(self.frame_width, self.frame_height), mipmap=True )
+        #     self.texture.flip_vertical()
+        #     self.player.video_set_format("RGBA", self.frame_width, self.frame_height, self.frame_pitch)
+        
+        def _update_frame_format(self):
+            Clock.unschedule(self._update_texture)
+            
+            try:
+                width_val=0
+                while width_val<1:
+                    width_val=self.player.video_get_width()
+                    time.sleep(self.spf)
+            except:
+                self.player.play()
+                width_val=0
+                while width_val<1:
+                    width_val=self.player.video_get_width()
+                    time.sleep(self.spf)
+                self.player.stop()
+
+            height_val = self.player.video_get_height()
+
+            self.frame_width=width_val
+            self.frame_height = height_val
+            self.frame_pitch = self.frame_width * 4  # RGBA
+            self._frame = np.zeros((self.frame_height, self.frame_width, 4), dtype=np.uint8)
+
+            # Texture placeholder
+            self.texture = Texture.create(size=(self.frame_width, self.frame_height), mipmap=True )
+            self.texture.flip_vertical()
+            self.player.video_set_format("RGBA", self.frame_width, self.frame_height, self.frame_pitch)
+
+            
+
+            
+        
+        def _setup_vlc_callbacks(self):
+            """Register callbacks for VLC to push frame data into our numpy array."""
+
+            def _format_cb(opaque, chroma, width, height, pitches, lines):
+                try:
+                    # Method 1: If they're pointers
+                    chroma_str = ctypes.string_at(chroma, 4).decode('utf-8', errors='ignore')
+                    width_val = width.contents.value
+                    height_val = height.contents.value
+                except:
+                    try:
+                        # Method 2: If they're arrays
+                        chroma_str = "".join([chr(chroma[i]) for i in range(4)])
+                        width_val = width[0]
+                        height_val = height[0]
+                    except:
+                        # Method 3: If they're direct values (unlikely but possible)
+                        chroma_str = "unknown"
+                        width_val = width
+                        height_val = height
+                # print(f"🎨 Format callback: {width_val}x{height_val}, chroma: {chroma_str}")
+                # self.player.video_set_format("RGBA", self.frame_width, self.frame_height, self.frame_pitch)
+                return 1
+
+            # Prepare ctypes buffers and callbacks
+            def _lock(data, p_pixels):
+                p_pixels.contents.value = self._frame.ctypes.data
+                return None
+
+            def _unlock(data, id, p_pixels):
+                pass
+
+            def _display(data, id):
+                pass
+
+
+            # self._format_cb= vlc.CallbackDecorators.VideoFormatCb(_format_cb)
+
+            # Keep references so they don’t get garbage-collected
+            self._lock_cb = vlc.CallbackDecorators.VideoLockCb(_lock)
+            self._unlock_cb = vlc.CallbackDecorators.VideoUnlockCb(_unlock)
+            self._display_cb = vlc.CallbackDecorators.VideoDisplayCb(_display)
+
+            # self.player.video_set_format_callbacks(self._format_cb, None)
+            self.player.video_set_callbacks(self._lock_cb, self._unlock_cb, self._display_cb, None)
+            # self.player.video_set_format("RGBA", self.frame_width, self.frame_height, self.frame_pitch)
+            self._callbacks_set=True
+        
+        def _update_texture(self, dt):
+            # print(0)
+            """Copy the current frame into the Kivy texture."""
+            try:
+                if self._frame is not None:
+                    # Upload the raw RGBA bytes into the Kivy texture
+                    self.texture.blit_buffer(self._frame.tobytes(), colorfmt='rgba', bufferfmt='ubyte')
+                    self.canvas.ask_update()
+            except AttributeError as e:
+                if self.texture==None:
+                    self._update_frame_format()
+                    # Upload the raw RGBA bytes into the Kivy texture
+                    self.texture.blit_buffer(self._frame.tobytes(), colorfmt='rgba', bufferfmt='ubyte')
+                    self.canvas.ask_update()
+                else:
+                    raise e
+                    
+
+        # def on_state(self, instance, value):
+        #     print('state:',value,self.player,self.media,self.eos)
+        #     if not self.player:
+        #         return
+        #     if value == 'play':
+        #         if self.eos:
+        #             self.player.stop()
+        #             # self.player.position = 0.
+        #         self.eos = False
+        #         self.player.play()
+        #     elif value == 'pause':
+        #         self.player.pause()
+        #     else:
+        #         self.player.stop()
+        #         # self._video.position = 0
+        
+        def _gstate(self):
+            # print(f"{self._state=}")
+            return self._state
+            # if not self.player:
+            #     return 'stop'
+            # else:
+            #     s=self.player.get_state()
+            #     ss=self._states.get(s,None)
+            #     if ss==None:
+            #         ss=f"{s}".lower().split('.')[-1]
+            #     return ss
+        
+        def _sstate(self,val):
+            if not self.player:
+                return False
+            if val=='play':
+                self.player.play()
+            elif val=='pause':
+                self.player.pause()
+            elif val=='stop':
+                self.player.stop()
+            # return True
+            return False
+        state=kvw.AliasProperty(_gstate,_sstate,bind=['_state',])
+
+        
+        
+        
+        def _geos(self):
+            return self._eos
+        eos=kvw.AliasProperty(_geos,bind=['_eos'])
+        
+        def seek(self,percent,precise=True):
+            self.player.set_position(percent)
+
+        
+        def _gvolume(self):
+            v=self.player.audio_get_volume()
+            if v<0:
+                return v
+            return v/100
+        
+        def _svolume(self,val):
+            ans= self.player.audio_set_volume(round(val*100))
+            if ans==-1:
+                return False
+            return True
+        volume=kvw.AliasProperty(_gvolume,_svolume)
+
+        
+        def length_cbk(self,event,player):
+            self._duration=self._gduration()
+        
+        def _gduration(self):
+            try:
+                d=self.media.get_duration()
+                if d!=-1:
+                    d=d/1000
+                if d==0:
+                    return -1
+                return d
+            except:
+                return -1
+        duration=kvw.AliasProperty(_gduration,bind=['_duration',])
+
+        
+        def state_stopped_cbk(self,event,player):
+            Clock.unschedule(self._update_texture)
+            # print(f"cb_{event=}")
+            self._state='stop'
+            self._position= 0
+        
+        def state_playing_cbk(self,event,player):
+            Clock.unschedule(self._update_texture)
+            Clock.schedule_interval(self._update_texture, self.spf)
+            self._state='play'
+            self._eos=False
+        
+        def state_endreached_cbk(self,event,player):
+            Clock.unschedule(self._update_texture)
+            self._state='stop'
+            self._eos=True
+            self._position= 0
+        
+        def state_paused_cbk(self,event,player):
+            Clock.unschedule(self._update_texture)
+            self._state='pause'
+
+        
+        def _gposition(self):
+            return self._position
+        
+        def _sposition(self,val):
+            try:
+                if self.duration!=0:
+                    seek_val=val/self.duration
+                    if 0.0<=seek_val<=1.0:
+                        self.seek(seek_val)
+                        return True
+                return False
+            except:
+                return False
+        position=kvw.AliasProperty(_gposition,_sposition,bind=['_position'])
+        
+        def position_cbk(self,event,player):
+            # self._position=self._gposition()
+            try:
+                self._position= round(self.player.get_position()*self.media.get_duration()/1000)
+            except:
+                self._position= -1
+        # @locked_screen
+        
+        def buffering_cbk(self,event,player):
+            # print('buffering')
+            # self.texture=CoreImage(self._preview).texture
+            if self.lock_screen_on_buffer:
+                app=get_kvApp()
+                # Clock.unschedule(app.dt_unlock)
+                # if not app.is_locked():
+                Clock.unschedule(app.dt_lock)
+                Clock.unschedule(app.dt_unlock)
+
+                Clock.schedule_once(app.dt_lock)
+                Clock.schedule_once(app.dt_unlock,5*self.spf)
+            # else:
+            #     Clock.schedule_once(get_kvApp().dt_unlock)
+            
+
+            
+            # Clock.schedule_once(get_kvApp().dt_unlock)
+            pass
+            # print(event)
+            # get_kvApp().lock()
+            # get_kvApp().unlock()
+
+        # def media_discovered_cbk(self,event,player):
+        #     self._update_frame_format()
+            # print('media')
+        # def mediaerror_cbk(self,event,player):
+        #     print(event)
+        
+        def em_init(self):
+            em=self.em
+            player=self.player
+            em.event_attach(vlc.EventType.MediaPlayerStopped, 
+                        self.state_stopped_cbk, player)
+            em.event_attach(vlc.EventType.MediaPlayerPlaying, \
+                            self.state_playing_cbk, player)
+            
+            # em.event_attach(vlc.EventType.MediaDiscovererEnded,
+            #     self.media_discovered_cbk, player)
+            # em.event_attach(vlc.EventType.MediaPlayerMediaChanged, \
+            #                 self.media_discovered_cbk, player)
+            # em.event_attach(vlc.EventType.MediaPlayerEncounteredError,\
+            #     self.mediaerror_cbk,player
+            #     )
+            
+            em.event_attach(vlc.EventType.MediaPlayerBuffering, \
+                            self.buffering_cbk, player)
+            
+            em.event_attach(vlc.EventType.MediaPlayerPaused, \
+                            self.state_paused_cbk, player)
+            em.event_attach(vlc.EventType.MediaPlayerTimeChanged, \
+                            self.position_cbk, player)
+            em.event_attach(vlc.EventType.MediaPlayerEndReached, \
+                            self.state_endreached_cbk, player)
+            em.event_attach(vlc.EventType.MediaPlayerLengthChanged, \
+                        self.length_cbk, player)
+        
+        def _gpreview(self):
+            return self._preview
+        
+        def _spreview(self,val):
+            if val:
+                self._preview=val
+                self.texture=CoreImage(val).texture
+                return True
+        preview=kvw.AliasProperty(_gpreview,_spreview)
+
+
+
+    kvWd=_VLCWidget
+    if focus_behavior:
+        kvWd=kvb.FocusBehavior,kvWd
+    kel=skivify(kvWd,source=source,allow_stretch=allow_stretch,k=k,
+        fit_mode=fit_mode,lock_screen_on_buffer=lock_screen_on_buffer,
+        **kwargs)
+    return kel
 
 @skwidget
-def FlatButton(text='flat_button',
+def VideoVLCPlayer(queue=[],k=None,focus_behavior=False,lock_screen_on_buffer=False,**kwargs):
+    kvWd=kvw.RelativeLayoutB
+
+    class _kvWd(kvWd):
+        queue=kvw.ListProperty([])
+        playing_media=kvw.ObjectProperty(None)
+        playing_index=kvw.NumericProperty(None)
+        hide_setup=kvw.BooleanProperty(True)
+        lock_screen_on_buffer=kvw.BooleanProperty(False)
+        video=None
+
+        _source=kvw.StringProperty(None)
+
+        def _gsource(self):
+            if self.video:
+                return self.video.source
+            else:
+                return None
+
+
+        source=kvw.AliasProperty(_gsource,bind=('_source',))
+
+        preview=kvw.StringProperty('skdata/0.png')
+
+        def on_media_parsed(self,media):
+            pass
+        def on_media_parse_start(self,media):
+            pass
+        def on_media_parse_cancel(self,media):
+            pass
+        def on_media_parse_error(self,media):
+            pass
+
+        def cancel_media_parse(self):
+            self.video.cancel_media_parse()
+
+        def __init__(self,**kwargs):
+            self.register_event_type('on_media_parse_start')
+            self.register_event_type('on_media_parsed')
+            self.register_event_type('on_media_parse_cancel')
+            self.register_event_type('on_media_parse_error')
+
+            self.register_event_type('on_lang_menu_open')
+            self.register_event_type('on_lang_menu_apply')
+            self.register_event_type('on_lang_menu_dismiss')
+
+            queue=kwargs.pop('queue',[])
+            self.register_event_type('on_queue_end')
+            preview=kwargs.get('preview',resource_find('skdata/0.png'))
+            lock_screen_on_buffer=kwargs.get('lock_screen_on_buffer',False)
+            fit_mode=kwargs.pop('fit_mode','contain')
+            allow_stretch=kwargs.pop('allow_stretch',True)
+            focus_behavior=kwargs.pop('focus_behavior',False)
+
+
+            self.video=VideoVLC(k=NOTKEY,preview=preview,lock_screen_on_buffer=lock_screen_on_buffer,fit_mode=fit_mode,allow_stretch=allow_stretch,focus_behavior=focus_behavior)
+            self.video.bind(
+                on_media_parsed=lambda ins,media:self.dispatch('on_media_parsed',media),
+                on_media_parse_start=lambda ins,media:self.dispatch('on_media_parse_start',media),
+                on_media_parse_cancel=lambda ins,media:self.dispatch('on_media_parse_cancel',media),
+                on_media_parse_error=lambda ins,media:self.dispatch('on_media_parse_error',media),
+                )
+            # if preview!=None:
+            #     self.video=VideoVLC(k=NOTKEY,preview=preview)
+            # else:
+            #     self.video=VideoVLC(k=NOTKEY)
+
+            self.video.bind(eos=lambda ins,v:self._schedule_next() if v else None)
+            self.bind(preview=lambda ins,v:setattr(self.video,'preview',v))
+            # self.video.bind(
+            #     source=lambda ins,val:self.dispatch('source',self,val)
+            #     )
+            self._plm=utils.PlaylistManager()
+            # self._plm.bind('on_track_changed',lambda plm,t:setattr(self,'_source',plm.get_current_track()))
+            # self._plm.bind('on_track_changed',lambda plm,t:print(self,'_source',t))
+            
+            self._plm.bind('on_track_changed',lambda plm,t:Clock.schedule_once(lambda dt:setattr(self,'_source',t)))
+            
+            self._plm.bind('on_playlist_end',lambda *x:self.dispatch('on_queue_end'))
+            # self._plm.bind('on_playlist_start',lambda *x:print('on_playlist_start',x))
+            # self.ids=utils.IDS()
+
+            list_audio=ListBox(k=NOTKEY,pos_hint={'top':1})
+            list_subs=ListBox(k=NOTKEY,pos_hint={'top':1})
+            lang_btn_apply=ClearRoundB('Apply',k=NOTKEY,size='y35')
+            lang_btn_cancel=ClearRoundB('Cancel',k=NOTKEY,size='y35')
+            r=25
+            self.ids=utils.IDS({
+                'player_slider': ProgressBarTouch(
+                    value=0,
+                    k=NOTKEY,
+                    size='y10',
+                    disabled=True,
+                    ),
+                'player_btn.back': ClearRoundB(
+                        mdi('skip-backward'),size=f'x{2*r}',
+                        k=NOTKEY,
+                        r=r,
+                        font_size=33,lcolor='',
+                        focus_behavior=focus_behavior,
+                    ),
+
+                'player_btn.play': ClearRoundB(
+                        mdi('play'),size=f'x{2*r}',
+                        k=NOTKEY,
+                        r=r,
+                        font_size=33,lcolor='',
+                        focus_behavior=focus_behavior,
+                    ),
+                'player_btn.stop': ClearRoundB(
+                        mdi('stop'),size=f'x{2*r}',
+                        k=NOTKEY,
+                        r=r,
+                        font_size=33,lcolor='',
+                        focus_behavior=focus_behavior,
+                    ),
+                'player_btn.fwd': ClearRoundB(
+                        mdi('skip-forward'),size=f'x{2*r}',
+                        k=NOTKEY,
+                        r=r,
+                        font_size=33,lcolor='',
+                        focus_behavior=focus_behavior,
+                    ),
+                'player_btn.lang': ClearRoundB(
+                        mdi('subtitles'),size=f'x{2*r}',
+                        k=NOTKEY,
+                        r=r,
+                        font_size=33,lcolor='',
+                        focus_behavior=focus_behavior,
+                    ),
+                'list_audio':list_audio,
+                'list_subs':list_subs,
+                'lang_btn_apply':lang_btn_apply,
+                'pop_lang':Popup(
+                    title='Language options',
+                    content=BoxitV(
+                        BoxitH(
+                            BoxitV(
+                                T(mdi('account-voice')+' Audio',size='y35',markup=True),
+                                list_audio,
+                                spacing=8,
+                                ),
+                            SeparatorV(),
+                            BoxitV(
+                                T(mdi('subtitles-outline')+' Subtitles',markup=True,size='y35'),
+                                list_subs,
+                                spacing=8,
+                                ),
+                            spacing=8
+                        ),
+                        lang_btn_apply,
+                        # BoxitH(
+                        #     lang_btn_apply,
+                        #     lang_btn_cancel,
+                        #     size='y35',
+                        #     spacing=8
+                        #     ),
+                            
+                            padding=8,
+                            spacing=8,
+                        ),
+                    k=NOTKEY,
+                    size_hint=(.6,.6)
+                    ),
+
+                'player_lbl.position': T('--:--',k=NOTKEY,halign='right',size='x60'),
+                'player_lbl.duration': T('--:--',k=NOTKEY,halign='left',size='x60'),
+
+
+            })
+
+
+            self.box=BoxitV(
+                self.ids['player_slider'],
+                BoxitH(
+                    self.ids['player_btn.back'],
+                    self.ids['player_btn.play'],
+                    self.ids['player_btn.stop'],
+                    self.ids['player_btn.fwd'],
+                    Fill(),
+                    self.ids['player_btn.lang'],
+                    BoxitH(
+                        self.ids['player_lbl.position'],
+                        T('/',size='x15',k=NOTKEY),
+                        self.ids['player_lbl.duration'],
+                        spacing=4,
+                        size='xchildren'
+                        ),
+                        k=NOTKEY
+                ),
+                k=NOTKEY,
+                padding=6,
+                spacing=6,
+                size=f'y{2*r+10+3*6}',
+            bcolor=[.25,.25,.25,.5]
+            )
+            self.ids['box']=self.box
+            self.video.bind(position=self._on_vpos)
+            self.video.bind(duration=self._on_vdur)
+            self.ids['player_btn.play'].bind(on_release=self._play_pause)
+            self.ids['player_btn.stop'].bind(on_release=lambda ins:self.video.player.stop())
+            self.ids['player_btn.back'].bind(on_release=lambda ins:self.prev())
+            self.ids['player_btn.fwd'].bind(on_release=lambda ins:self.next())
+            self.ids['player_btn.lang'].bind(on_release=self._open_lang_menu)
+
+            self.ids['player_slider'].bind(on_clickup=lambda ins,spos:self.video.seek(spos[0]))
+            self.ids['lang_btn_apply'].bind(on_release=self._on_btn_apply_lang_menu)
+
+            self.ids['pop_lang'].bind(on_dismiss=self._on_lang_menu_dismiss)
+
+            self.video.bind(state=self._vstate)
+            self.bind(queue=self._on_queue)
+            super().__init__(**kwargs)
+            self.add_widget(self.video)
+            self.add_widget(self.box)
+            self.hidden={}
+            if queue:
+                Clock.schedule_once(lambda dt:setattr(self,'queue',queue))
+            if self.hide_setup:
+                Clock.schedule_once(self._hide_setup)
+        def _on_btn_apply_lang_menu(self,ins):
+            a=self.ids.list_audio.data_selected
+            s=self.ids.list_subs.data_selected
+            if a and s:
+                a=a[0]
+                s=s[0]
+            else:
+                return
+            self.video.player.audio_set_track(a['id'])
+            self.video.player.video_set_spu(s['id'])
+            self.ids.pop_lang.dismiss()
+            self.dispatch('on_lang_menu_apply')
+
+        def _open_lang_menu(self,ins):
+            a=self.video.player.audio_get_track()
+            s=self.video.player.video_get_spu()
+
+            ac=self.video.player.audio_get_track_count()
+            sc=self.video.player.video_get_spu_count()
+            if ac==-1 and sc==-1:
+                return
+            # print(self.video.media.get_tracks_info().Audio)
+            # self.video.media.tracks_release()
+            la=self.video.player.audio_get_track_description()
+            ls=self.video.player.video_get_spu_description()
+            if not ls:
+                ls=[(-1,b'Disabled'),]
+            if not la:
+                la=[(-1,b'Disabled'),]
+
+            sdata=[]
+            ss=0
+            for i,ti in enumerate(ls):
+                if ti[0]==s:
+                    ss=i
+                sdata.append(
+                    dict(text=ti[1].decode('utf-8'),id=ti[0])
+                    )
+            adata=[]
+            sa=0
+            for i,ti in enumerate(la):
+                if ti[0]==a:
+                    sa=i
+                adata.append(
+                    dict(text=ti[1].decode('utf-8'),id=ti[0])
+                    )
+            self.ids.list_subs.data=sdata
+            self.ids.list_audio.data=adata
+
+
+
+            self.ids.list_subs.select(ss)
+            self.ids.list_audio.select(sa)
+            
+            self.ids.pop_lang.open()
+            self.dispatch('on_lang_menu_open')
+        def on_lang_menu_open(self,*x):
+            pass
+        def on_lang_menu_apply(self,*x):
+            pass
+        def _on_lang_menu_dismiss(self,*x):
+            self.dispatch('on_lang_menu_dismiss')
+        def on_lang_menu_dismiss(self,*x):
+            pass
+        def _hide_setup(self,dt):
+            self.kvWindow=utils.get_kvWindow()
+            self.kvWindow.bind(mouse_pos=self.on_mouse_pos)
+            self.mpos=self.kvWindow.mouse_pos
+            self._hide_ctrls(0)
+            self._unhide_ctrls(0)
+            
+            Clock.unschedule(self._hide_ctrls)
+            Clock.schedule_once(self._unhide_ctrls)
+            Clock.schedule_once(self._hide_ctrls,3)
+            # Clock.schedule_once(lambda dt:setattr(self.kvWindow,'show_cursor',False),3)
+
+
+        
+
+        def on_mouse_pos(self,window,pos):
+            self.mpos=pos
+            if self.collide_point(*pos):
+                # print(pos)
+                Clock.unschedule(self._hide_ctrls)
+                Clock.schedule_once(self._unhide_ctrls)
+                Clock.schedule_once(self._hide_ctrls,3)
+
+        def _hide_ctrls(self,dt):
+            
+            wid=self.box
+            # if wid.height==0:
+            #     return
+            shrink=True
+            s=getattr(wid,'size',(100,100)).copy()
+            sh=getattr(wid,'size_hint',(1,1)).copy()
+            o=getattr(wid,'opacity',1)
+            d=getattr(wid,'disabled',False)
+            # print('hide:',(s,sh,o,d))
+            self.hidden['box']=(s,sh,o,d)
+            # print(self.hidden)
+            # print(k,':',(s,sh,o,d))
+            # setattr(w,'size')
+            if shrink:
+                setattr(wid,'size',(0,0))
+                setattr(wid,'size_hint',(None,None))
+            setattr(wid,'opacity',0)
+            setattr(wid,'disabled',True)
+            if self.collide_point(*self.mpos) or self.mpos==(0,0):
+                self.kvWindow.show_cursor=False
+
+            # print(self.hidden)
+        def _unhide_ctrls(self,dt):
+            if self.collide_point(*self.mpos):
+                self.kvWindow.show_cursor=True
+            
+            enforce={}
+            wid=self.box
+            try:
+                s,sh,o,d=self.hidden.get('box')
+                # print('unhide:',(s,sh,o,d))
+            except:
+                # traceback.print_exc()
+                s=getattr(wid,'size',(100,100))
+                sh=getattr(wid,'size_hint',(1,1))
+                o=getattr(wid,'opacity',1)
+                d=getattr(wid,'disabled',False)
+            
+            # print(k,':',(s,sh,o,d))
+            
+            setattr(wid,'size',s)
+            setattr(wid,'size_hint',sh)
+            setattr(wid,'opacity',o)
+            setattr(wid,'disabled',d)
+
+            for prop,v in enforce.items():
+                setattr(wid,prop,v)
+
+        def _on_vpos(self,ins,v):
+            self.ids['player_slider'].value=v
+            self.ids['player_lbl.position'].text=utils.seconds2human(round(v),short=True)
+            
+        def _on_vdur(self,ins,v):
+            self.ids['player_slider'].max=v
+            self.ids['player_lbl.duration'].text=utils.seconds2human(round(v),short=True)
+
+
+        def _vstate(self,ins,val):
+            if self.video.state!='play':
+                self.ids['player_btn.play'].text=mdi('play')
+            else:
+                self.ids['player_btn.play'].text=mdi('pause')
+
+            if self.video.state=='stop':
+                self.ids['player_slider'].disabled=True
+            else:
+                self.ids['player_slider'].disabled=False
+            
+
+        def _play_pause(self,*x):
+            if self.video.state!='play':
+                self.video.player.play()
+            else:
+                self.video.player.pause()
+
+        def _on_queue(self,ins,val):
+            # print(self.video,val)
+            self._plm.populate(val,clear_existing=True)
+            c=self._plm.get_current_track()
+            if c!=None:
+                # self._source=c
+                # print("self._source:",c)
+                self.video.source=c
+                Clock.schedule_once(lambda dt:setattr(self,'_source',c))
+            # self.dispatch('')
+
+        def _dt_next(self,dt):
+            self.next()
+        def _schedule_next(self,*x):
+            Clock.schedule_once(self._dt_next)
+        def next(self):
+            n=self._plm.next_track()
+            # print(n)
+            if n!=None:
+                # self.video.state='stop'
+                # Clock.schedule_once(lambda dt:setattr(self,'source', n))
+                self.video.source=n
+                self.video.player.play()
+                # Clock.schedule_once(lambda dt:setattr(self,'state','play'))
+                
+        def prev(self):
+            n=self._plm.prev_track()
+            # print(n)
+            if n!=None:
+                self.video.source=n
+                self.video.player.play()
+                # Clock.schedule_once(lambda dt:setattr(self,'source', n))
+                # Clock.schedule_once(lambda dt:setattr(self,'state','play'))
+        def _gstate(self):
+            if self.video:
+                return self.video.state
+            else:
+                return 'stop'
+        def _sstate(self,val):
+            # print(val,self.video,self.video.source)
+            if self.video:
+                if val=='play' and self.video.source==None:
+                    c=self._plm.get_current_track()
+                    if c!=None:
+                        self.video.source=c
+                # print(val,self.video,self.video.source)
+                self.video.state=val
+                return self.video.state==val
+            else:
+                return False
+        def stop(self):
+            if self.video:
+                self.video.player.stop()
+        def on_queue_end(self,*args):
+            pass
+
+
+
+        state=kvw.AliasProperty(_gstate,_sstate)
+
+
+    kvWd=_kvWd
+
+    kel=skivify_v2(kvWd,k=k,queue=queue,focus_behavior=focus_behavior,lock_screen_on_buffer=lock_screen_on_buffer,**kwargs)
+
+    return kel
+
+@skwidget
+def FlatButton(
+    text='flat_button',
     lcolor=[.5,.5,.5,1],
     bcolor_normal=[.345, .345, .345, 0],
     bcolor_down=[.2, .64, .8, 1],
@@ -6496,12 +8089,53 @@ def ToggleButtonBoxit(*widgets,focus_behavior=False,hover_highlight=False,enable
     return kel
 
 @skwidget
-def FlatButtonAngle(text='button',angle=90,enable_events=True,k=None,on_event='on_release', **kwargs):
-    # kwargs=_preproces(**kwargs)
+def FlatButtonAngle(text='button',angle=90,enable_events=True,focus_behavior=False,k=None,on_event='on_release', **kwargs):
+    '''
+    Creates a *Flat-style* button widget dynamically with added functionalities. Contents are rotated according to `angle`.
+
+    ## Dynamic Creation Parameters
+
+    {focus_behavior}
+    > Default is False.
+
+    ## Parameters
+
+    `angle (int or float)`: Angle of rotation of the button text. Defaults to 90.
+    
+    {bgline_state}
+
+    {common}
+
+    ## Returns
+    
+    `WIDGET` widget created dynamically.
+
+    ## Kivy Bases
+    
+    - `BoxLayout`
+        - `Label`
+
+    {base_params}
+    
+    ## Properties
+
+    {button_properties}
+
+    ## Properties
+
+    ## Events
+    
+    {events_button}
+    '''
+    # kwargs=_preprocess(**kwargs)
     # global _future_elements, _future_bind
 
     
     kvWd=kvw.FlatButtonAngle
+    if focus_behavior:
+        class _(kvb.FocusBehavior,kvWd):
+            pass
+        kvWd=_
 
     # kvWd=kvw.add_parent(kvWd,behavior)
     if k==None and text:
@@ -6564,7 +8198,7 @@ def Spinner(# default value shown
     values=('choice0', 'choice1'),
     enable_events=False,k=None,on_event='text', **kwargs
     ):
-    # kwargs=_preproces(**kwargs)
+    # kwargs=_preprocess(**kwargs)
     # global _future_elements, _future_bind
 
     
@@ -6665,6 +8299,9 @@ def ListBox(
     keyboard_scroll=True,
     effect_cls='scroll', # damped, scroll, opacity, no
     base_cls=None,
+    bar_color=[.4, .4, .4, .9],
+    bar_inactive_color=[.4, .4, .4, .6],
+    bar_width=8,
     **kwargs
     ):
     if isinstance(effect_cls,str):
@@ -6682,8 +8319,9 @@ def ListBox(
             case 'scroll':
                 from kivy.effects.scroll import ScrollEffect as effect_cls
 
-    kel=skivify(kvw.RV,k=k,enable_events=enable_events,effect_cls=effect_cls,on_event=on_event,data=data,keyboard_scroll=keyboard_scroll,
+    kel=skivify((kvw.RV),k=k,enable_events=enable_events,effect_cls=effect_cls,on_event=on_event,data=data,keyboard_scroll=keyboard_scroll,
         # selected_color=selected_color,
+        bar_color=bar_color,bar_inactive_color=bar_inactive_color,bar_width=bar_width,
         **kwargs)
     # Clock.schedule_once(lambda dt:kel.setter('data')(kel,data))
     
@@ -6696,9 +8334,18 @@ def Rowlist(
     keyboard_scroll=True,
     effect_cls='scroll', # damped, scroll, opacity, no
     base_cls=None,
-    cell_defaults={'text':'','halign':'left','valign':'middle','shorten':True,'padding':4,'markup':True,'font_name':'segoeui.ttf'},
+    row_defaults={},
+    cell_defaults={},
     **kwargs
     ):
+    _cell_defaults={'text':'','halign':'left','valign':'middle','shorten':True,'padding':4,'markup':True,'font_name':'segoeui.ttf'}
+    _cell_defaults.update(cell_defaults)
+
+    _row_defaults=dict(padding=4,selectable=True,buttonbehavior=False)
+    _row_defaults.update(row_defaults)
+
+    _viewclass_base=kwargs.pop('viewclass_base',kvw.RowSelectable)
+
     if isinstance(effect_cls,str):
         match effect_cls:
             case 'no':
@@ -6713,8 +8360,9 @@ def Rowlist(
         k=k,
 
         viewclass_cell=kvw.LabelB,
-        cell_defaults=cell_defaults,
-        viewclass_base=kvw.RowSelectable,
+        cell_defaults=_cell_defaults,
+        row_defaults=_row_defaults,
+        viewclass_base=_viewclass_base,
         
         enable_events=enable_events,effect_cls=effect_cls,on_event=on_event,data=data,keyboard_scroll=keyboard_scroll,
         **kwargs)
@@ -6731,7 +8379,7 @@ def Playlist(
     keyboard_scroll=True,
     **kwargs
     ):
-    # kwargs=_preproces(**kwargs)
+    # kwargs=_preprocess(**kwargs)
     # global _future_elements, _future_bind
 
     
@@ -6759,10 +8407,33 @@ def Artistlist(
     k=None,
     enable_events=True,
     on_event='on_selection',
+    do_dot_subevent=False,
     keyboard_scroll=True,
+    bar_color=[.4, .4, .4, .9],
+    bar_inactive_color=[.4, .4, .4, .6],
+    bar_width=8,
+    effect_cls='scroll', # damped, scroll, opacity, no
+    orientation='vertical',
+
     **kwargs
     ):
-    kel=skivify(kvw.Artistlist,k=k,enable_events=enable_events,on_event=on_event,data=data,keyboard_scroll=keyboard_scroll,**kwargs)
+    if isinstance(effect_cls,str):
+        match effect_cls:
+            case 'no':
+                from kivy.effects.scroll import ScrollEffect as effect_cls
+            case 'opacity':
+                from kivy.effects.scroll import OpacityScrollEffect as effect_cls
+            case 'damped':
+                from kivy.effects.scroll import DampedScrollEffect as effect_cls
+            case 'scroll':
+                from kivy.effects.scroll import ScrollEffect as effect_cls
+    if orientation=='vertical':
+        kvWd=kvw.Artistlist
+    else:
+        kvWd=kvw.ArtistlistH
+    kel=skivify(kvWd,k=k,enable_events=enable_events,effect_cls=effect_cls,on_event=on_event,data=data,keyboard_scroll=keyboard_scroll,do_dot_subevent=do_dot_subevent,
+        bar_color=bar_color,bar_inactive_color=bar_inactive_color,bar_width=bar_width,
+        **kwargs)
     
     # kel.id=k
     kel.post='Artistlist'
@@ -6783,7 +8454,7 @@ def Albumlist(
     keyboard_scroll=True,
     **kwargs
     ):
-    # kwargs=_preproces(**kwargs)
+    # kwargs=_preprocess(**kwargs)
     # global _future_elements, _future_bind
 
     
@@ -6811,7 +8482,7 @@ def Albumlist(
 
 @skwidget
 def TextInput(text='',enable_events=False,multiline=False,k=None,on_event='on_text_validate', **kwargs):
-    # kwargs=_preproces(**kwargs)
+    # kwargs=_preprocess(**kwargs)
     # global _future_elements, _future_bind
 
     W=kvw.kvInput
@@ -6820,7 +8491,7 @@ def TextInput(text='',enable_events=False,multiline=False,k=None,on_event='on_te
     class W(kvw.kvInput):
         last_added=''
         # delayed_text=kvw.StringProperty('')
-        delay_interval = NumericProperty(.3)  # delay after typing stops
+        delay_interval = NumericProperty(.5)  # delay after typing stops
         def __init__(self, **kwargs):
             
             self._typing_timer = None
@@ -6859,7 +8530,7 @@ def TextInput(text='',enable_events=False,multiline=False,k=None,on_event='on_te
             """Event handler for when delayed text is ready"""
             pass
 
-    kel=skivify(W,text=text,k=k,multiline=multiline,enable_events=enable_events,on_event=on_event,**kwargs)
+    kel=skivify((W),text=text,k=k,multiline=multiline,enable_events=enable_events,on_event=on_event,**kwargs)
     return kel
 
 Input=In=TextInput
@@ -6870,11 +8541,11 @@ def TextInputDark(text='',enable_events=False,multiline=False,k=None,on_event='o
 
     # if 'on_insert_text' in on_event:
     class W(kvw.kvInput):
-        foreground_color=kvw.ListProperty([1,1,1,1])
+        foreground_color=kvw.ColorProperty([1,1,1,1])
         background_active=kvw.StringProperty('atlas://skdata/sktheme/textinput_active')
         background_normal=kvw.StringProperty('atlas://skdata/sktheme/textinput')
         background_disabled_normal=kvw.StringProperty('atlas://skdata/sktheme/textinput_disabled')
-        disabled_foreground_color=kvw.ListProperty([1,1,1,.5])
+        disabled_foreground_color=kvw.ColorProperty([1,1,1,.5])
         last_added=''
         def __init__(self, **kwargs):
             self.register_event_type('on_insert_text')
@@ -7059,9 +8730,10 @@ def ScrollView(
     k=None,
     bar_color=[.4, .4, .4, .9],
     bar_inactive_color=[.4, .4, .4, .6],
+    bar_width=8,
     scroll_type=['bars', 'content'],
     effect_cls='scroll', # damped, scroll, opacity, no
-    bar_width=8,**kwargs):
+    **kwargs):
 
     # H=0
     # W=0
@@ -7079,10 +8751,6 @@ def ScrollView(
     from kivy.uix.scrollview import ScrollView as kvWd
 
     if isinstance(effect_cls,str):
-        # if effect_cls!='damped':
-        # if effect_cls in ('scroll','no'):
-        #     from kivy.effects.scroll import ScrollEffect as effect_cls
-        # else:
         match effect_cls:
             case 'no':
                 from kivy.effects.scroll import ScrollEffect as effect_cls
@@ -7114,7 +8782,8 @@ def ScrollView(
 
 
 
-    kel=kvWd(
+    kel=skivify(kvWd,
+        k=k,
         scroll_type=scroll_type,
         # size_hint=(sh0, sh1), 
         # size=(content.width, content.height),
@@ -7126,7 +8795,7 @@ def ScrollView(
         effect_cls=effect_cls,
         **kwargs
         )
-    kel.id=k
+    # kel.id=k
     kel.add_widget(content)
     return kel
 
@@ -7140,8 +8809,8 @@ def Popup(content,title='Popup window',enable_events=False,on_event='on_dismiss'
         content=content,
         k=k,
         enable_events=enable_events,
+        do_dot_subevent=do_dot_subevent,
         on_event=on_event,
-
         **kwargs)
 
     # kel=kvWd(
@@ -7184,7 +8853,7 @@ def ScreenManager(
     '''
     transition: no slide card swap fade wipe fallout risein,
     '''
-    # kwargs=_preproces(**kwargs)
+    # kwargs=_preprocess(**kwargs)
     # global _future_elements, _future_bind
     
     
@@ -7230,6 +8899,7 @@ def ScreenManager(
             s=kvw.Screen(name=n)
             if v:
                 s.add_widget(v)
+                setattr(v,'screen_name',n)
             
 
         kel.add_widget(s)
@@ -7244,6 +8914,9 @@ Screens=ScreenManager
 def Screen(widgets=[],name='',k=None,**kwargs):
     if k==None:
         k=name
+    else:
+        if name=='':
+            name=k
     # if name=='' and k:
     #     name=k
     kvWd=kvw.Screen
@@ -7254,6 +8927,7 @@ def Screen(widgets=[],name='',k=None,**kwargs):
             kel.add_widget(w)
     else:
         kel.add_widget(widgets)
+    setattr(kel,'screen_name',name)
     return kel
 
 
@@ -7274,7 +8948,7 @@ def CalcSheet(
     {: .prompt-warning }
     > Experimental widget. Imagine a fusion of Excel and Python.
     '''
-    kwargs=_preproces(**kwargs)
+    kwargs=_preprocess(**kwargs)
     global _future_elements, _future_bind,_post_elements
 
     
@@ -7408,7 +9082,7 @@ def ProgressBar2(value=0,max=1,k=None,
 def Slider(value=0,min=0,max=1,k=None,enable_events=False,on_event='value',**kwargs):
     from kivy.uix.slider import Slider as kvWd
     # kel=kvWd(value=value,min=min,max=max,**kwargs)
-    kel=skivify_v2(kvWd,value=value,min=min,max=max,k=k,enable_events=enable_events,on_event=on_event,**kwargs)
+    kel=skivify(kvWd,value=value,min=min,max=max,k=k,enable_events=enable_events,on_event=on_event,**kwargs)
     # kel.id=k
     return kel
 
@@ -7424,8 +9098,8 @@ def ScrollbarMirror(k=None,enable_events=False,on_event=None,**kwargs):
 def BarTouchH(value=0,max=1,scroll_delta=0,k=None,enable_events=False,on_event="value",**kwargs):
     class kvWd(kvw.RelativeLayout):
         scroll_delta=NumericProperty(0)
-        bcolor = kvw.ListProperty([50/255, 164/255, 206/255, 1])  # background color
-        lcolor = kvw.ListProperty([.5, .5, .5, 1])  # line color
+        bcolor = kvw.ColorProperty([50/255, 164/255, 206/255, 1])  # background color
+        lcolor = kvw.ColorProperty([.5, .5, .5, 1])  # line color
         lwidth = kvw.NumericProperty(2)          # line width
         _scroll_btns={'scrollup','scrolldown'}
         max = kvw.NumericProperty(1)
@@ -7582,8 +9256,8 @@ BarTouch=BarTouchH
 def BarTouchV(value=0,max=1,scroll_delta=0,k=None,enable_events=False,on_event="value",**kwargs):
     class kvWd(kvw.RelativeLayout):
         scroll_delta=NumericProperty(0)
-        bcolor = kvw.ListProperty([50/255, 164/255, 206/255, 1])  # background color
-        lcolor = kvw.ListProperty([.5, .5, .5, 1])  # line color
+        bcolor = kvw.ColorProperty([50/255, 164/255, 206/255, 1])  # background color
+        lcolor = kvw.ColorProperty([.5, .5, .5, 1])  # line color
         lwidth = kvw.NumericProperty(2)          # line width
         _scroll_btns={'scrollup','scrolldown'}
         max = kvw.NumericProperty(1)
@@ -7687,12 +9361,21 @@ def ProgressBarTouch(value=0,max=1,k=None,enable_events=True,on_event='on_clicku
     # from kvWidgets import ProgressBarB as kvWd
     class kvWd2(kvWd):
         spos=kvw.ListProperty([0,0])
+
         def __init__(self,**kwargs):
-            
-            super(kvWd2, self).__init__(**kwargs)
             self.register_event_type('on_clickup')
+            super(kvWd2, self).__init__(**kwargs)
+            
+
+        # def on_touch_down(self,touch):
+        #     if touch.is_mouse_scrolling:
+        #         return False
+        #     if not self.collide_point(touch.x, touch.y):
+        #         return False
 
         def on_touch_up(self,touch):
+            if self.disabled:
+                return False
             if touch.is_mouse_scrolling:
                 return False
             if not self.collide_point(touch.x, touch.y):
@@ -7705,9 +9388,15 @@ def ProgressBarTouch(value=0,max=1,k=None,enable_events=True,on_event='on_clicku
 
             self.spos=sx,sy
             self.value=sx*self.max
-            self.dispatch('on_clickup',touch.spos)
+            self.dispatch('on_clickup',self.spos)
         def on_clickup(self,spos):
+            # print(ins,self)
             pass
+
+        # value=kvw.AliasProperty(
+            
+        #     )
+
 
     kel=skivify_v2(kvWd2,value=value,max=max,enable_events=enable_events,on_event=on_event,k=k,**kwargs)
     
@@ -7728,6 +9417,8 @@ def SliderTouch(value=0,min=0,max=1,k=None,enable_events=True,on_event='on_click
             super(kvWd2, self).__init__(**kwargs)
 
         def on_touch_up(self,touch):
+            if self.disabled:
+                return False
             if touch.is_mouse_scrolling:
                 return False
             if not self.collide_point(touch.x, touch.y):
@@ -7768,7 +9459,9 @@ def PAW():
 def Fill(k=NOTKEY,**kwargs):
     size=kwargs.pop('size',(0,0))
     size_hint=kwargs.pop('size_hint',(1,1))
-    return Boxit(size=size,size_hint=size_hint,k=k,**kwargs)
+    kel=Boxit(size=size,size_hint=size_hint,k=k,**kwargs)
+    kel.is_void=True
+    return kel
 
 @_widget_ctor
 def SeparatorV(bcolor='gray',size=(2,1),size_hint=(None,1),k=NOTKEY,**kwargs):
@@ -7871,7 +9564,8 @@ class EventManager:
     __rules__={}
     __ev_to_rule__={}
     __unhandled__=set()
-    def __init__(self):
+    def __init__(self,verbose=False):
+        self.verbose=verbose
         self.__events__['__Start__']=self._nofunc
         self.__events__['__Close__']=self._nofunc
     def _nofunc(self,*l,**kwargs):
@@ -7894,6 +9588,8 @@ class EventManager:
                 return self._
 
     def __call__(self,app,ev,*args,**kwargs):
+        if self.verbose==True:
+            print('Event:',ev)
         self.app=app
         try:
             callback=self.__events__[ev]
@@ -7903,14 +9599,15 @@ class EventManager:
             else:
                 callback=self.__test_rules__(ev)
         
-        callback(app,ev,*args,**kwargs)
+        return callback(app,ev,*args,**kwargs)
         # try:
         #     callback(app,ev,*args,**kwargs)
         # except Exception as e:
         #     traceback.print_exc()
             # pass
     def _(self,app,ev,*args,**kwargs):
-        print('Unhandled:',ev)
+        if self.verbose!='silent':
+            print('Unhandled:',ev)
         pass
     def event(self,event_name=None):
         event_name=[event_name]
@@ -7956,6 +9653,7 @@ def Filelist(
         k=None,
         folders_only=False,
         file_types_filter=(),
+        focus_color='',
         **kw,
         ):
     '''
@@ -8163,7 +9861,7 @@ def Filelist(
 
         # lambda *x: on_box_w(label_path_box,label_path_box.width)
     # label_path.bind(texture_size=on_text)
-    path_input=InputDark(k=NOTKEY,)
+    path_input=InputDark(k=NOTKEY,write_tab=False)
     def on_pre_open(*x):
         setattr(path_input,'text',f"{label_path.path}")
         path_input.do_cursor_movement('cursor_end')
@@ -8268,7 +9966,7 @@ def Filelist(
 
         
     btn_apply_sort.bind(on_release=on_btn_apply_sort)
-    input_search=InputDark(hint_text=f"Search {cdir.name}",k=NOTKEY)
+    input_search=InputDark(hint_text=f"Search {cdir.name}",k=NOTKEY,write_tab=False)
     sort_menu=BoxitV(
             Label('Name',halign='left',padding=(4,0,0,0),k=NOTKEY,)*\
             LabelCheck(mdi('sort-alphabetical-ascending')+" A-Z",active=True,markup=True,group='_sortmethod',allow_no_selection=False,k=NOTKEY,)*\
@@ -8464,7 +10162,7 @@ def Filelist(
     resize_shortcut.bind(height=lambda *x:setattr(shortcuts,'scroll_y',1))
     bh=BoxitH(k=NOTKEY,)
     bar_width=15
-    filelist=Rowlist(spacing=2,k=NOTKEY,bar_width=bar_width)
+    filelist=Rowlist(spacing=2,k=NOTKEY,bar_width=bar_width,focus_color=focus_color)
     rlt_box=BoxitV(
         Fill(size=(0,bar_width),size_hint=(1,None))*FlatButton(mdi('chevron-up',size=bar_width),size=f'{bar_width}',k=NOTKEY,lcolor='',
             on_release=lambda ins:setattr(filelist,'scroll_y',1)
@@ -8743,6 +10441,158 @@ def Filelist(
 
     return kel
 
+
+###################################
+# MATPLOTLIB
+###################################
+@skwidget
+def MPLFigure(k=None,**kwargs):
+    from kivy_matplotlib_widget.uix.graph_widget import MatplotFigure as kvWd
+    return skivify(kvWd,k=k,**kwargs)
+@skwidget
+def MPLLegendRv(k=None,**kwargs):
+    from kivy_matplotlib_widget.uix.legend_widget import LegendRv as kvWd
+    return skivify(kvWd,k=k,**kwargs)
+@skwidget
+def MPLLegendRvHorizontal(k=None,**kwargs):
+    from kivy_matplotlib_widget.uix.legend_widget import LegendRvHorizontal as kvWd
+    return skivify(kvWd,k=k,**kwargs)
+MPLLegendRvH=MPLLegendRvHorizontal
+
+@skwidget
+def MPLFigureScatter(k=None,**kwargs):
+    from kivy_matplotlib_widget.uix.graph_widget_scatter import MatplotFigureScatter as kvWd
+    return skivify(kvWd,k=k,**kwargs)
+@skwidget
+def MPLFigureTwinx(k=None,**kwargs):
+    from kivy_matplotlib_widget.uix.graph_widget_twinx import MatplotFigureTwinx as kvWd
+    return skivify(kvWd,k=k,**kwargs)
+@skwidget
+def MPLFigureCropFactor(k=None,**kwargs):
+    from kivy_matplotlib_widget.uix.graph_widget_crop_factor import MatplotFigureCropFactor as kvWd
+    return skivify(kvWd,k=k,**kwargs)
+@skwidget
+def MPLFigureGeneral(k=None,**kwargs):
+    from kivy_matplotlib_widget.uix.graph_widget_general import MatplotFigureGeneral as kvWd
+    return skivify(kvWd,k=k,**kwargs)
+
+@skwidget
+def MPLFigureSubplot(k=None,**kwargs):
+    from kivy_matplotlib_widget.uix.graph_subplot_widget import MatplotFigureSubplot as kvWd
+    return skivify(kvWd,k=k,**kwargs)
+@skwidget
+def MPLFigure3D(k=None,**kwargs):
+    from kivy_matplotlib_widget.uix.graph_widget_3d import MatplotFigure3D as kvWd
+    return skivify(kvWd,k=k,**kwargs)
+@skwidget
+def MPLFigure3DLayout(k=None,**kwargs):
+    from kivy_matplotlib_widget.uix.graph_widget_3d import MatplotFigure3DLayout as kvWd
+    return skivify(kvWd,k=k,**kwargs)
+@skwidget
+def MPLKivyNavToolbar(k=None,**kwargs):
+    from kivy_matplotlib_widget.uix.navigation_bar_widget import KivyMatplotNavToolbar as kvWd
+    return skivify(kvWd,k=k,**kwargs)
+def MPLNavToolbar(k=None,**kwargs):
+    from kivy_matplotlib_widget.uix.navigation_bar_widget import MatplotNavToolbar as kvWd
+    return skivify(kvWd,k=k,**kwargs)
+###################################
+def AddNavigation(focus_map={},widget=None, focus_color=None,focus_action=None,disable_fallback_nav=False):
+    if widget:
+        isbox=getattr(widget,'_isbox',None)
+        if isbox=='vertical':
+            up=focus_map.pop('up',None)
+            down=focus_map.pop('down',None)
+
+            nchildren=0
+            c=0
+            focusable_children=[]
+            for child in reversed(widget.children):
+                if hasattr(child,'focus_map'):
+                    if focus_color:
+                        child.focus_color=focus_color
+                    if not child.focus_action:
+                        child.focus_action=focus_action
+
+                    focusable_children.append(child)
+                    c+=1
+                    nchildren=c
+            # print(f"{nchildren = }")
+            for c,child in enumerate(focusable_children):
+                base_focus_map=focus_map.copy()
+                if disable_fallback_nav:
+                    child.disable_fallback_nav=disable_fallback_nav
+                    try:
+                        base_focus_map.update({'up':focusable_children[c-1]})
+                    except:
+                        pass
+                    try:
+                        base_focus_map.update({'down':focusable_children[c+1]})
+                    except:
+                        pass
+
+                if c==0:
+                    if up!=None:
+                        base_focus_map['up']=up
+                    else:
+                        base_focus_map['up']=focusable_children[-1].id
+                elif c+1==nchildren:
+                    if down!=None:
+                        base_focus_map['down']=down
+                    else:
+                        base_focus_map['down']=focusable_children[0].id
+
+                base_focus_map.update(child.focus_map)
+                child.focus_map=base_focus_map
+                # print(child.id,':',child.focus_map)
+        if isbox=='horizontal':
+            left=focus_map.pop('left',None)
+            right=focus_map.pop('righ',None)
+
+            nchildren=0
+            c=0
+            focusable_children=[]
+            for child in reversed(widget.children):
+                if hasattr(child,'focus_map'):
+                    if focus_color:
+                        child.focus_color=focus_color
+                    if not child.focus_action:
+                        child.focus_action=focus_action
+
+                    focusable_children.append(child)
+                    c+=1
+                    nchildren=c
+            # print(f"{nchildren = }")
+            for c,child in enumerate(focusable_children):
+                base_focus_map=focus_map.copy()
+                if disable_fallback_nav:
+                    child.disable_fallback_nav=disable_fallback_nav
+                    try:
+                        base_focus_map.update({'left':focusable_children[c-1]})
+                    except:
+                        pass
+                    try:
+                        base_focus_map.update({'right':focusable_children[c+1]})
+                    except:
+                        pass
+                
+                if c==0:
+                    if left!=None:
+                        base_focus_map['left']=left
+                    else:
+                        base_focus_map['left']=focusable_children[-1].id
+                elif c+1==nchildren:
+                    if right!=None:
+                        base_focus_map['right']=right
+                    else:
+                        base_focus_map['right']=focusable_children[0].id
+
+                base_focus_map.update(child.focus_map)
+                child.focus_map=base_focus_map
+                # print(child.id,':',child.focus_map)
+    return widget
+
+
+
 if __name__ == '__main__':
     pass
     # lyt=[[
@@ -8761,7 +10611,7 @@ if __name__ == '__main__':
     # @say_bye
     # @skwidget
     # def Button_(text='button',enable_events=True,k=None,on_event='on_release', **kwargs):
-    #     # kwargs=_preproces(**kwargs)
+    #     # kwargs=_preprocess(**kwargs)
     #     # global _future_elements, _future_bind
     #     kel=kvw.kvButton(text=text,**kwargs)
         

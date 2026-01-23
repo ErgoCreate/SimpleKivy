@@ -11,10 +11,89 @@ SK_PATH_FILE = os.path.abspath(__file__)
 SK_PATH = os.path.dirname(SK_PATH_FILE)
 resource_add_path(SK_PATH)
 
-
 from kivy.utils import platform
 from typing import List, Optional
 _did_auto_config=False
+
+NOTKEY=-67191210201
+
+def seconds2human(seconds,short=False):
+    """
+    Convert a duration in seconds to a human-readable format.
+    
+    Args:
+        seconds (int): The duration in seconds.
+    
+    Returns:
+        str: Human-readable duration (e.g., "1 hr 15 mins 30 secs").
+    """
+    # if seconds<0:
+    #     return '--:--'
+    hours = seconds // 3600
+    minutes = (seconds % 3600) // 60
+    seconds = seconds % 60
+    
+    parts = []
+    if short:
+        parts.append(f"{hours}".rjust(2,"0"))
+        parts.append(f"{minutes}".rjust(2,"0"))
+        parts.append(f"{seconds}".rjust(2,"0"))
+        if hours<1:
+            return ':'.join(parts[1:])
+        return ":".join(parts)
+    else:
+        if hours > 0:
+            parts.append(f"{hours} hr{'s' if hours > 1 else ''}")
+        if minutes > 0:
+            parts.append(f"{minutes} min{'s' if minutes > 1 else ''}")
+        if seconds >= 0:
+            parts.append(f"{seconds} sec{'s' if seconds > 1 else ''}")
+    
+        return " ".join(parts)
+
+def re_search(*args,default='',**kwargs):
+    ans=re.search(*args,**kwargs)
+    if not ans:
+        return default
+    else:
+        return ans.group()
+
+class IDS(dict):
+    def __getattr__(self,name):
+        return self.__getitem__(name)
+    def __setitem__(self, key, value):
+        try:
+            setattr(value,'id',key)
+        except:
+            pass
+        super().__setitem__(key,value)
+    #     setattr(value,'id',key)
+    #     self.ids.__setitem__(key, value)
+
+class infinite:
+    def __init__(self,*args,_name='',**kwargs):
+        self._name=_name
+        try:
+            super(infinite, self).__init__(**kwargs)
+        except:
+            pass
+    def __call__(self,*args,**kwargs):
+        return infinite()
+    def __getitem__(self, var, **args):
+        if var in self.__dict__:
+            v = self.__dict__[var]
+            return v
+        else:
+            v=infinite()
+            self.__dict__[var]=v
+            return v
+    def __getattr__(self, name):
+        return infinite(_name=name)
+    def __enter__(self,*args):
+        return infinite()
+    def __exit__(self,*args):
+        return infinite()
+
 class DotDict:
     def __init__(self,**kwargs):
         self._orignal=kwargs
@@ -52,6 +131,124 @@ pos_hints=PosHints(
     )
 # print(pos_hints.top_center)
 
+def get_id(widget_or_k,default=NOTKEY):
+    if isinstance(widget_or_k,str):
+        return widget_or_k
+
+    return getattr(widget_or_k,'id',NOTKEY)
+
+def _preprocess(**kwargs):
+    # if 'size' in kwargs:
+    #     if isinstance()
+    nkwargs={}
+    for k,v in kwargs.items():
+        nkwargs[k]=v
+        if k=='key':
+            nkwargs['k']=nkwargs.pop('key')
+        elif k=='size':
+            if isinstance(v,(str,infinite)):
+                if isinstance(v,infinite):
+                    v=v._name
+                # print(v)
+                # if 'children' in v:
+                #     if 'y' in v:
+                #         v=0
+                #         for
+                # print(v)
+                if v.isnumeric():
+                    v=f'x{v}y{v}'
+
+                xs=re_search(r"x[0-9]+",v,flags=re.IGNORECASE)
+                ys=re_search(r"y[0-9]+",v,flags=re.IGNORECASE)
+                nkwargs['size']=[0,0]
+                # print(xs,ys)
+                if xs:
+                    snum=re.sub(r"\D", "", xs)
+                    nkwargs['size_hint_x']=None
+                    nkwargs['size'][0]=int(snum)
+                if ys:
+                    snum=re.sub(r"\D", "", ys)
+                    nkwargs['size_hint_y']=None
+                    nkwargs['size'][1]=int(snum)
+                # print(nkwargs)
+            # elif isinstance(v,infinite):
+            #     # print(v.name)
+            #     v=v._name
+            #     xs=re_search(r"x[0-9]+",v,flags=re.IGNORECASE)
+            #     ys=re_search(r"y[0-9]+",v,flags=re.IGNORECASE)
+            #     nkwargs['size']=[0,0]
+            #     if xs:
+            #         snum=re.sub(r"\D", "", xs)
+            #         nkwargs['size_hint_x']=None
+            #         nkwargs['size'][0]=int(snum)
+            #     if ys:
+            #         snum=re.sub(r"\D", "", ys)
+            #         nkwargs['size_hint_y']=None
+            #         nkwargs['size'][1]=int(snum)
+        elif 'color' in k:
+            if isinstance(v,str):
+                if not '#' in v:
+                    try:
+                        v=Colors[v]
+                    except:
+                        raise ValueError(f"Invalid color string \"{v}\".\nValid colors are:{Colors.keys()}")
+                else:
+                    try:
+                        v=hex2rgb(v, alpha=255, vmax=1)
+                    except:
+                        raise ValueError(f"Invalid color string \"{v}\"")
+            # elif isinstance(v,dict):
+                # for key,val in v.items():
+                #     v[key]=utils.rgba2hex(utils.resolve_color(val))
+                #     print(v[key])
+
+                    
+            nkwargs[k]=v
+        elif 'transition' in k:
+            if isinstance(v,str):
+                import kivy.uix.screenmanager as smm
+                # v=v.lower()
+                match v:
+                    case 'no':
+                        v=smm.NoTransition()
+                    case 'slide':
+                        v=smm.SlideTransition()
+                    case 'card':
+                        v=smm.CardTransition()
+                    case 'fade':
+                        v=smm.FadeTransition()
+                    case 'wipe':
+                        v=smm.WipeTransition()
+                    case 'swap':
+                        v=smm.SwapTransition()
+                    case 'fallout':
+                        v=smm.FallOutTransition()
+                    case 'risein':
+                        v=smm.RiseInTransition()
+
+            nkwargs[k]=v
+        elif 'font_name'==k:
+            nkwargs[k]=Fonts.get(v,v)
+        elif 'schedule_once'==k:
+            nkwargs.pop(k)
+            Clock.schedule_once(v)
+
+    return nkwargs
+
+def setattrs(obj,**kw_attrs):
+    '''
+    Set multiple attributes of an object (`obj`), by calling `setattr` for each `name: value` pair in `**kw_attrs`.
+
+    Equivalent to:
+
+    ```py
+    for k,v in kw_attrs.items():
+        setattr(obj,k,v)
+    ```
+    '''
+    for k,v in kw_attrs.items():
+        setattr(obj,k,v)
+
 def schedule_multiple_once(*callbacks,timeout=0):
     for ci in callbacks:
         Clock.schedule_once(ci,timeout)
@@ -72,6 +269,13 @@ def create_derived_class(instance,**kwargs):
     for k,v in instance.properties().items():
         setattr(base,k,v)
     return base
+
+def get_last_focused():
+    from .kvBehaviors import FocusBehavior
+    return FocusBehavior.last_focused
+def set_last_focused(last_focused_widget):
+    from .kvBehaviors import FocusBehavior
+    FocusBehavior.last_focused=last_focused_widget
 
 # def create_derived_class(instance, class_name="Derived"):
 #     """
@@ -125,7 +329,7 @@ def do_nothing(*a,**kw):
     pass
 # def lambda_schedule_once()
 
-# _kvWindow=[None]
+_kvWindow=[None]
 # _kvApp=[None]
 _kvApp = None
 # _kvTextInput=[None]
@@ -209,7 +413,7 @@ def __getattr__(name):
                     self.frame_texture.blit_buffer(buf, colorfmt='bgr', bufferfmt='ubyte')
                     self.texture=self.frame_texture
                 def on_state(self,ins,val):
-                    print("Camera state = ",val)
+                    # print("Camera state = ",val)
                     if val=="play":
                         self.play()
                     elif val=="stop":
@@ -272,21 +476,169 @@ def is_iterable(obj):
     except TypeError:
         return False
 
-# def get_kvApp():
-#     if _kvApp[0]:
-#         pass
-#     else:
-#         from kivy.app import App
-#         _kvApp[0]=App.get_running_app()
-#     return _kvApp[0]
+class KeyBinder:
+    keycodes = {
+        # specials keys
+        'backspace': 8, 'tab': 9, 'enter': 13, 'rshift': 303, 'shift': 304,
+        'alt': 308, 'rctrl': 306, 'lctrl': 305,
+        'super': 309, 'alt-gr': 307, 'compose': 311, 'pipe': 310,
+        'capslock': 301, 'escape': 27, 'spacebar': 32, 'pageup': 280,
+        'pagedown': 281, 'end': 279, 'home': 278, 'left': 276, 'up':
+        273, 'right': 275, 'down': 274, 'insert': 277, 'delete': 127,
+        'numlock': 300, 'print': 144, 'screenlock': 145, 'pause': 19,
+
+        # a-z keys
+        'a': 97, 'b': 98, 'c': 99, 'd': 100, 'e': 101, 'f': 102, 'g': 103,
+        'h': 104, 'i': 105, 'j': 106, 'k': 107, 'l': 108, 'm': 109, 'n': 110,
+        'o': 111, 'p': 112, 'q': 113, 'r': 114, 's': 115, 't': 116, 'u': 117,
+        'v': 118, 'w': 119, 'x': 120, 'y': 121, 'z': 122,
+
+        # 0-9 keys
+        '0': 48, '1': 49, '2': 50, '3': 51, '4': 52,
+        '5': 53, '6': 54, '7': 55, '8': 56, '9': 57,
+
+        # numpad
+        'numpad0': 256, 'numpad1': 257, 'numpad2': 258, 'numpad3': 259,
+        'numpad4': 260, 'numpad5': 261, 'numpad6': 262, 'numpad7': 263,
+        'numpad8': 264, 'numpad9': 265, 'numpaddecimal': 266,
+        'numpaddivide': 267, 'numpadmul': 268, 'numpadsubstract': 269,
+        'numpadadd': 270, 'numpadenter': 271,
+
+        # F1-15
+        'f1': 282, 'f2': 283, 'f3': 284, 'f4': 285, 'f5': 286, 'f6': 287,
+        'f7': 288, 'f8': 289, 'f9': 290, 'f10': 291, 'f11': 292, 'f12': 293,
+        'f13': 294, 'f14': 295, 'f15': 296,
+
+        # other keys
+        '(': 40, ')': 41,
+        '[': 91, ']': 93,
+        '{': 123, '}': 125,
+        ':': 58, ';': 59,
+        '=': 61, '+': 43,
+        '-': 45, '_': 95,
+        '/': 47, '*': 42,
+        # '?': 47,
+        '`': 96, '~': 126,
+        '´': 180, '¦': 166,
+        '\\': 92, '|': 124,
+        '"': 34, "'": 39,
+        ',': 44, '.': 46,
+        '<': 60, '>': 62,
+        '@': 64, '!': 33,
+        '#': 35, '$': 36,
+        '%': 37, '^': 94,
+        '&': 38, '¬': 172,
+        '¨': 168, '…': 8230,
+        'ù': 249, 'à': 224,
+        'é': 233, 'è': 232,
+
+        # Available only in SimpleKivy
+        # {
+        'media_play':1073742085,
+        'volume_down':1073741953,
+        'volume_up':1073741952,
+        'volume_mute':1073742086,
+        'media_previous':1073742083,
+        'media_next':1073742082,
+        'media_stop':1073742084,
+        'menu':1073741925,
+        # }
+    }
+    def __init__(self,key_map={}):
+        self._map={}
+        self.update_keycodes()
+        self.key_map=key_map
+    def update_keycodes(self,keycodes_to_add={}):
+        KeyBinder.keycodes.update(keycodes_to_add)
+        KeyBinder.sedocyek={}
+        for k,v in KeyBinder.keycodes.items():
+            if v in KeyBinder.sedocyek:
+                print((k,v),'overwrites',(KeyBinder.sedocyek[v],k))
+                continue
+            KeyBinder.sedocyek[v]=k
+
+    @property
+    def key_map(self):
+        return self._key_map
+    @key_map.setter
+    def key_map(self,val):
+        self._map={}
+        val_expand={}
 
 
-def auto_config(size=(800,600),exit_on_escape=False,multisamples=2,desktop=True,resizable=True,multitouch_emulation=False,window_state='visible',**kwargs):
+        for k,v in val.items():
+            if k and isinstance(k,tuple):
+                if not k:
+                    raise ValueError(f'Empty or invalid "keybind" value "{k}"')
+                if len(k)==1:
+                    self._map[k[0]]=v
+                    continue
+                elif len(k)>1:
+                    self._map[frozenset(k)]=v
+                    continue  
+
+            if ',' in k:
+                for kpart in k.split(','):
+                    val_expand[kpart.strip()]=v
+                continue
+            val_expand[k]=v
+        for k,v in val_expand.items():
+            if '+' in k:
+                self._map[frozenset(k.split('+'))]=v
+            else:
+                self._map[k]=v
+
+
+
+        self._key_map=val
+    def __call__(self,window, key, scancode=None, codepoint=None, modifier=None, **kwargs):
+        # window, keycode, text, modifiers
+        keycode = (key, self.keycode_to_string(key))
+        if not self.key_map:
+            print(f"{window=}, {keycode=}, {scancode=}, {codepoint=}, {modifier=}, {kwargs=}")
+        else:
+            fs_pressed=self._pressed_as_fs_key(keycode[1],modifier)
+            callback=self._map.get(fs_pressed,None)
+            if isinstance(callback,str):
+                get_kvApp().trigger_event(callback)
+            elif hasattr(callback,'__call__'):
+                callback()
+    def _pressed_as_fs_key(self,k1,mod):
+        if mod:
+            fs=frozenset({k1,*mod})
+        else:
+            fs=k1
+        self.last_key_pressed=fs
+        return fs
+    def keycode_to_string(self, value):
+        '''Convert a keycode number to a string according to the
+        :attr:`Keyboard.keycodes`. If the value is not found in the
+        keycodes, it will return ''.
+        '''
+        return KeyBinder.sedocyek.get(value,'')
+    def string_to_keycode(self,s):
+        return KeyBinder.keycodes.get(s,None)
+KeyBinder.update_keycodes(None)
+
+def auto_config(
+    size=(800,600),
+    exit_on_escape=False,
+    multisamples=2,
+    desktop=True,
+    resizable=True,
+    borderless=False,
+    multitouch_emulation=False,
+    window_state='visible',
+    log_enable=True,
+    **kwargs):
     global _did_auto_config
     from kivy.config import Config
     Config.set('kivy', 'exit_on_escape', int(exit_on_escape))
     Config.set('kivy', 'desktop', int(desktop))
+    # Config.set('kivy', 'keyboard_mode', "dock")
+    Config.set('kivy', 'log_enable', int(log_enable))
     Config.set('graphics', 'resizable', int(resizable))
+    Config.set('graphics', 'borderless', int(borderless))
     Config.set('graphics', 'multisamples', multisamples)
     Config.set('graphics', 'window_state', window_state)
     if not multitouch_emulation:
@@ -322,37 +674,8 @@ def get_transition(tname='slide'):
     t=import_from('kivy.uix.screenmanager',tname.title().replace('out','Out').replace('in','In')+'Transition')
     return t
 
-def re_search(*args,default='',**kwargs):
-    ans=re.search(*args,**kwargs)
-    if not ans:
-        return default
-    else:
-        return ans.group()
-    # print(size)
 
-class infinite:
-    def __init__(self,*args,_name='',**kwargs):
-        self._name=_name
-        try:
-            super(infinite, self).__init__(**kwargs)
-        except:
-            pass
-    def __call__(self,*args,**kwargs):
-        return infinite()
-    def __getitem__(self, var, **args):
-        if var in self.__dict__:
-            v = self.__dict__[var]
-            return v
-        else:
-            v=infinite()
-            self.__dict__[var]=v
-            return v
-    def __getattr__(self, name):
-        return infinite(_name=name)
-    def __enter__(self,*args):
-        return infinite()
-    def __exit__(self,*args):
-        return infinite()
+
 
 class CaseInsensitiveDict(dict):
 
@@ -396,6 +719,53 @@ class CaseInsensitiveDict(dict):
     def _convert_keys(self):
         for k in list(self.keys()):
             v = super(CaseInsensitiveDict, self).pop(k)
+            self.__setitem__(k, v)
+
+class WordOrderInsensitiveDict(dict):
+    @classmethod
+    def _k(cls, key):
+        if isinstance(key, str):
+            key=key.lower()
+            if ' ' in key:
+                key=frozenset([word.strip() for word in key.split()])
+        return key
+
+    def __init__(self, *args, **kwargs):
+        super(WordOrderInsensitiveDict, self).__init__(*args, **kwargs)
+        self._convert_keys()
+
+    def __getitem__(self, key):
+        return super(WordOrderInsensitiveDict, self).__getitem__(self.__class__._k(key))
+
+    def __setitem__(self, key, value):
+        super(WordOrderInsensitiveDict, self).__setitem__(
+            self.__class__._k(key), value)
+
+    def __delitem__(self, key):
+        return super(WordOrderInsensitiveDict, self).__delitem__(self.__class__._k(key))
+
+    def __contains__(self, key):
+        return super(WordOrderInsensitiveDict, self).__contains__(self.__class__._k(key))
+
+    def has_key(self, key):
+        return super(WordOrderInsensitiveDict, self).has_key(self.__class__._k(key))
+
+    def pop(self, key, *args, **kwargs):
+        return super(WordOrderInsensitiveDict, self).pop(self.__class__._k(key), *args, **kwargs)
+
+    def get(self, key, *args, **kwargs):
+        return super(WordOrderInsensitiveDict, self).get(self.__class__._k(key), *args, **kwargs)
+
+    def setdefault(self, key, *args, **kwargs):
+        return super(WordOrderInsensitiveDict, self).setdefault(self.__class__._k(key), *args, **kwargs)
+
+    def update(self, E={}, **F):
+        super(WordOrderInsensitiveDict, self).update(self.__class__(E))
+        super(WordOrderInsensitiveDict, self).update(self.__class__(**F))
+
+    def _convert_keys(self):
+        for k in list(self.keys()):
+            v = super(WordOrderInsensitiveDict, self).pop(k)
             self.__setitem__(k, v)
 
 class _Void:
@@ -511,6 +881,7 @@ class NamedColors:
         if not self._tab20:
             self._tab20=[(0.12156862745098039, 0.4666666666666667, 0.7058823529411765, 1), (0.6823529411764706, 0.7803921568627451, 0.9098039215686274, 1), (1.0, 0.4980392156862745, 0.054901960784313725, 1), (1.0, 0.7333333333333333, 0.47058823529411764, 1), (0.17254901960784313, 0.6274509803921569, 0.17254901960784313, 1), (0.596078431372549, 0.8745098039215686, 0.5411764705882353, 1), (0.8392156862745098, 0.15294117647058825, 0.1568627450980392, 1), (1.0, 0.596078431372549, 0.5882352941176471, 1), (0.5803921568627451, 0.403921568627451, 0.7411764705882353, 1), (0.7725490196078432, 0.6901960784313725, 0.8352941176470589, 1), (0.5490196078431373, 0.33725490196078434, 0.29411764705882354, 1), (0.7686274509803922, 0.611764705882353, 0.5803921568627451, 1), (0.8901960784313725, 0.4666666666666667, 0.7607843137254902, 1), (0.9686274509803922, 0.7137254901960784, 0.8235294117647058, 1), (0.4980392156862745, 0.4980392156862745, 0.4980392156862745, 1), (0.7803921568627451, 0.7803921568627451, 0.7803921568627451, 1), (0.7372549019607844, 0.7411764705882353, 0.13333333333333333, 1), (0.8588235294117647, 0.8588235294117647, 0.5529411764705883, 1), (0.09019607843137255, 0.7450980392156863, 0.8117647058823529, 1), (0.6196078431372549, 0.8549019607843137, 0.8980392156862745, 1)]
         return self._tab20
+
     # def get_tab20_by_index(self,i):
 
 
@@ -567,14 +938,35 @@ colors=Colors=NamedColors()
 #     tab_20.append((*(tab20_colors[i]),1))
 # print(tab_20)
 
-Fonts = CaseInsensitiveDict({
+# Fonts = CaseInsensitiveDict({
+#     'DejaVu': 'DejaVuSans.ttf',
+#     'DejaVusans': 'DejaVuSans.ttf',
+#     'Roboto': 'Roboto-Regular.ttf',
+#     'Roboto it': 'Roboto-Italic.ttf',
+#     'Roboto b': 'Roboto-Bold.ttf',
+#     'Roboto itb': 'Roboto-BoldItalic.ttf',
+#     'Roboto bit': 'Roboto-BoldItalic.ttf',
+#     'Mono': 'RobotoMono-Regular.ttf',
+#     'Segoe UI': 'segoeui.ttf',
+#     'Segoe Symbol': 'seguisym.ttf',
+#     'Segoe UI Symbol': 'seguisym.ttf',
+#     'Segoe': 'segoeui.ttf',
+#     'Lucida Sans': 'lsans.ttf',
+#     'Lucida Sans it': 'lsansi.ttf',
+#     'Lucida Sans itb': 'LSANSDI.TTF',
+#     'Lucida Sans bit': 'LSANSDI.TTF',
+#     'Lucida Sans b': 'LSANSD.TTF',
+# })
+
+Fonts=WordOrderInsensitiveDict(
+    {
     'DejaVu': 'DejaVuSans.ttf',
     'DejaVusans': 'DejaVuSans.ttf',
     'Roboto': 'Roboto-Regular.ttf',
     'Roboto it': 'Roboto-Italic.ttf',
     'Roboto b': 'Roboto-Bold.ttf',
-    'Roboto itb': 'Roboto-BoldItalic.ttf',
-    'Roboto bit': 'Roboto-BoldItalic.ttf',
+    'Roboto it b': 'Roboto-BoldItalic.ttf',
+    # 'Roboto b it': 'Roboto-BoldItalic.ttf',
     'Mono': 'RobotoMono-Regular.ttf',
     'Segoe UI': 'segoeui.ttf',
     'Segoe Symbol': 'seguisym.ttf',
@@ -582,10 +974,11 @@ Fonts = CaseInsensitiveDict({
     'Segoe': 'segoeui.ttf',
     'Lucida Sans': 'lsans.ttf',
     'Lucida Sans it': 'lsansi.ttf',
-    'Lucida Sans itb': 'LSANSDI.TTF',
-    'Lucida Sans bit': 'LSANSDI.TTF',
+    'Lucida Sans it b': 'LSANSDI.TTF',
+    # 'Lucida Sans bit': 'LSANSDI.TTF',
     'Lucida Sans b': 'LSANSD.TTF',
-})
+}
+)
 
 def _resolve_color(c):
     if type(c) is str:
@@ -611,7 +1004,25 @@ def resolve_color(v):
     elif isinstance(v,dict):
         for k,val in v.items():
             v[k]=rgba2hex(resolve_color(val))
+        return v
     return v
+def resolve_color_hex(v):
+    if isinstance(v,str):
+        if not '#' in v:
+            try:
+                v=Colors[v]
+            except:
+                raise ValueError(f"Invalid color string \"{v}\".\nValid colors are:{Colors.keys()}")
+        else:
+            return v
+            # try:
+            #     v=hex2rgb(v, alpha=255, vmax=1)
+            # except:
+            #     raise ValueError(f"Invalid color string \"{v}\"")
+    elif isinstance(v,dict):
+        for k,val in v.items():
+            v[k]=rgba2hex(resolve_color(val))
+    return rgba2hex([vi*255 for vi in v])
 
 def resolve_relative_pos_hint(
     widget_relative,to_this_widget,hint='same',
@@ -761,11 +1172,21 @@ class IconFont:
 
     def __init__(self, ttf_families={},
                  # You only need one, but  you can use css and fontd
-                 css_dir=None, fontd_dir=None, fontd=None,prepend='',default_font_size=None):
+                 css_dir=None,
+                 fontd=None,
+                 
+                 fontd_dir=None,
+
+                 prepend='',
+
+                 default_font_size=None
+                 ):
         self._initprops=ttf_families,css_dir,fontd_dir,fontd,prepend
-        if type(ttf_families) is str:
+        # if type(ttf_families) is str:
+        if isinstance(ttf_families,str):
             self.ttf_families = {'regular': ttf_families}
-        elif type(ttf_families) in [list, tuple]:
+        # elif type(ttf_families) in [list, tuple]:
+        elif isinstance(ttf_families, (list, tuple)):
             self.ttf_families = {}
             c = 0
             for f in ttf_families:
@@ -777,6 +1198,7 @@ class IconFont:
         self.prepend=prepend
         self.default_font_size=default_font_size
         # self.ttf_dir=os.path.abspath(ttf_dir)
+
         self.ttf_dir = os.path.abspath(list(self.ttf_families.values())[0])
         self.css_dir = css_dir
         self.css = None
@@ -816,37 +1238,47 @@ class IconFont:
 
         # return '[font='+self.ttf_dir+']'+chr(val)+'[/font]'
         # return markup_str(chr(val),font=self.ttf_dir)
-    def __call__(self, key, size=None, color='', list_tags=[], dic_tags={}, font_size=None,
-        # bold=False
-        ):
-        key=self.prepend+key
-        if not size:
-            size = font_size
-        if not size:
-            size=self.default_font_size
+    def _key_and_ttf(self,key):
+        key = key.strip()
 
         if ' ' in key:
             family, key = key.split()
+            key=self.prepend+key
             try:
                 ttf_dir = self.ttf_families[family]
             except:
                 family=family.split('-')[-1]
                 ttf_dir = self.ttf_families[family]
         else:
+            key=self.prepend+key
             ttf_dir = self.ttf_dir
+        return key,ttf_dir
 
-        try:
-            val = self.fontd[key]
-            if type(val) == str:
-                val = int(val.strip('#'), 16)
-                self.fontd[key] = val
-            # val=chr(val)
-        # else:
-        except KeyError:
-            val = self.get_val_from_css(key)
-            if val is None:
-                # return key
-                return markup_str(key, font=ttf_dir, size=size, color=color, list_tags=list_tags, dic_tags=dic_tags)
+    def __call__(self, key, size=None, color='', list_tags=[], dic_tags={}, font_size=None,
+        # bold=False
+        ):
+        key,ttf_dir=self._key_and_ttf(key)
+
+        if not size:
+            size = font_size
+        if not size:
+            size=self.default_font_size
+
+        # try:
+        #     val = self.fontd[key]
+        #     if isinstance(val,str):
+        #         # val = int(val.strip('#'), 16)
+        #         val=self._codepoint_to_int(val)
+        #         self.fontd[key] = val
+        #     # val=chr(val)
+        # # else:
+        # except KeyError:
+        val = self.get_val_from_css(key)
+        if val is None:
+            print('KeyError: key \"', key, '\"', ' could not be found in ' +
+            self.css_dir + ', key returned', sep='')
+            # return key
+            return markup_str(key, font=ttf_dir, size=size, color=color, list_tags=list_tags, dic_tags=dic_tags)
             # try:
             #     # print(self.css)
             #     val=self.css.split(key+':')[1].split('}')[0]
@@ -859,44 +1291,282 @@ class IconFont:
             #     print('KeyError: key \"',key,'\"',' could not be found',sep='')
             #     return key
         ans=markup_str(chr(val), font=ttf_dir, size=size, color=color, list_tags=list_tags, dic_tags=dic_tags)
-        # if bold:
-        #     ans='[b]'+ans+'[/b]'
         return ans
-
+    def _codepoint_to_int(self,val):
+        val=val.strip().replace('\\', '').replace('"', '').replace("'", "")
+        val = int(val.strip(), 16)
+        return val
     def get_val_from_css(self, key):
         try:
-            # print(self.css)
-            val = self.css.split(key + ':')[1].split('}')[0]
-            for p in 'before { } : \" \' \\ ; content'.split():
-                val = val.replace(p, '')
-            # print(val)
-            val = int(val.strip(), 16)
-            self.fontd[key] = val
+            val = self.fontd[key]
+            if isinstance(val,str):
+                val=self._codepoint_to_int(val)
+                self.fontd[key] = val
             return val
-        except:
-            print('KeyError: key \"', key, '\"', ' could not be found in ' +
-                  self.css_dir + ', key returned', sep='')
-            return
+        except KeyError:
+            # print(key)
+            val=self._get_font_value_optimized(key)
+            # print(val)
+            if val:
+                # val=val.replace('\\','')
+                val= self._codepoint_to_int(val)
+                self.fontd[key] = val
+            
+            # val=self._codepoint_to_int(val)
+            # self.fontd[key] = val
+        return val
+        ##########################################
+        # Old
+        ##########################################
+        # try:
+        #     val = self.css.split(key + ':')[1].split('}')[0]
+        #     for p in 'before { } : \" \' \\ ; content'.split():
+        #         val = val.replace(p, '')
+        #     print(val)
+        #     val = int(val.strip(), 16)
+        #     self.fontd[key] = val
+        #     return val
+        # except:
+        #     return
+        ##########################################
+    def _get_font_value_optimized(self, key, property_name=None):
+        """
+        Optimized font value extractor with exact class matching.
+        Prioritizes most likely and fastest patterns first.
+        
+        Args:
+            css (str): CSS string
+            key (str): Class name
+            property_name (str, optional): Specific property to look for
+        
+        Returns:
+            str or None: The extracted value, or None if not found
+        """
+        css=self.css
+        escaped_key = re.escape(key)
+        
+        # If property is specified, use direct search (fastest path)
+        if property_name:
+            # Most specific patterns first - these are fastest when they match
+            patterns = [
+                # Pattern 1: Exact class with exact property (most specific and fastest)
+                rf'\.{escaped_key}\b\s*{{[^}}]*{re.escape(property_name)}\s*:\s*["\']([^"\']+)["\']',
+                # Pattern 2: Class with pseudo-element and exact property
+                rf'\.{escaped_key}\b(?:::[a-zA-Z-]+)?\s*{{[^}}]*{re.escape(property_name)}\s*:\s*["\']([^"\']+)["\']',
+            ]
+            
+            for pattern in patterns:
+                match = re.search(pattern, css, re.IGNORECASE | re.DOTALL)
+                if match:
+                    return match.group(1)
+            return None
+        
+        # No property specified - use smart property detection
+        # Order patterns by likelihood of success and speed
+        
+        # FAST PATTERNS (minimal backtracking, specific matches)
+        fast_patterns = [
+            # Pattern 1: FontAwesome exact match (very common, specific property)
+            rf'\.{escaped_key}\b\s*{{[^}}]*--fa\s*:\s*["\']([^"\']+)["\']',
+            # Pattern 2: Content property with exact class (very common for icons)
+            rf'\.{escaped_key}\b\s*{{[^}}]*content\s*:\s*["\']([^"\']+)["\']',
+            # Pattern 3: FontAwesome with pseudo-element
+            rf'\.{escaped_key}\b::before\s*{{[^}}]*--fa\s*:\s*["\']([^"\']+)["\']',
+            # Pattern 4: Content with ::before (common for icon fonts)
+            rf'\.{escaped_key}\b::before\s*{{[^}}]*content\s*:\s*["\']([^"\']+)["\']',
+        ]
+        
+        for pattern in fast_patterns:
+            match = re.search(pattern, css, re.IGNORECASE | re.DOTALL)
+            if match:
+                return match.group(1)
+        
+        # MEDIUM PATTERNS (slightly more flexible but still reasonably fast)
+        medium_patterns = [
+            # Pattern 5: Any pseudo-element with FontAwesome
+            rf'\.{escaped_key}\b(?:::[a-zA-Z-]+)?\s*{{[^}}]*--fa\s*:\s*["\']([^"\']+)["\']',
+            # Pattern 6: Any pseudo-element with content
+            rf'\.{escaped_key}\b(?:::[a-zA-Z-]+)?\s*{{[^}}]*content\s*:\s*["\']([^"\']+)["\']',
+        ]
+        
+        for pattern in medium_patterns:
+            match = re.search(pattern, css, re.IGNORECASE | re.DOTALL)
+            if match:
+                return match.group(1)
+        
+        # FLEXIBLE PATTERNS (slower but more comprehensive - last resort before fallback)
+        flexible_patterns = [
+            # Pattern 7: Common icon properties in order of likelihood
+            rf'\.{escaped_key}\b\s*{{[^}}]*(?:--fa|content|font-family|src)\s*:\s*["\']([^"\']+)["\']',
+            # Pattern 8: With pseudo-elements and common properties
+            rf'\.{escaped_key}\b(?:::[a-zA-Z-]+)?\s*{{[^}}]*(?:--fa|content|font-family|src)\s*:\s*["\']([^"\']+)["\']',
+        ]
+        
+        for pattern in flexible_patterns:
+            match = re.search(pattern, css, re.IGNORECASE | re.DOTALL)
+            if match:
+                return match.group(1)
+        
+        # ULTIMATE FALLBACK: Exact class + first quoted string
+        # This is the slowest but most flexible option
+        return self._fast_exact_class_fallback(escaped_key)
+    def _fast_exact_class_fallback(self, escaped_key):
+        """
+        Optimized fallback that finds exact class and extracts first quoted value.
+        Uses more specific patterns first for better performance.
+        """
+        css=self.css
+        # Try most common patterns first
+        fallback_patterns = [
+            # Pattern 1: Simple class without pseudo-element (most common)
+            rf'\.{escaped_key}\b\s*{{([^}}]+)}}',
+            # Pattern 2: Class with ::before (common for icons)
+            rf'\.{escaped_key}\b::before\s*{{([^}}]+)}}',
+            # Pattern 3: Class with any pseudo-element
+            rf'\.{escaped_key}\b(?:::[a-zA-Z-]+)?\s*{{([^}}]+)}}',
+        ]
+        
+        for pattern in fallback_patterns:
+            match = re.search(pattern, css, re.IGNORECASE | re.DOTALL)
+            if match:
+                declaration_block = match.group(1)
+                # Extract first quoted value
+                quoted_match = re.search(r'["\']([^"\']+)["\']', declaration_block)
+                if quoted_match:
+                    return quoted_match.group(1)
+        
+        return None
     def copy(self):
         return IconFont(*self._initprops)
+    # def _codepoint_to_int(self,codepoint):
+    #     r"""
+    #     Convert codepoint string to int value. needs to be converted to chr to be used.
+    #     Handles formats like: "\e16d", "\F1B97", "\\e16d", "\\F1B97"
+    #     """
+    #     # Clean the codepoint string
+    #     clean_codepoint = codepoint.strip().replace('\\', '').replace('"', '').replace("'", "")
+        
+    #     # Handle different formats
+    #     if clean_codepoint.startswith(('e', 'E')) and len(clean_codepoint) <= 5:
+    #         # Private Use Area format (e000-f8ff)
+    #         hex_val = f"e{clean_codepoint[1:]:0>4s}"  # Ensure 4-digit hex
+    #         code = int(hex_val, 16)
+    #     elif clean_codepoint.startswith(('f', 'F')) and len(clean_codepoint) <= 6:
+    #         # Private Use Area format (f0000-ffffd)
+    #         hex_val = f"f{clean_codepoint[1:]:0>5s}"  # Ensure 5-digit hex
+    #         code = int(hex_val, 16)
+    #     else:
+    #         # Try to parse as regular hex
+    #         try:
+    #             code = int(clean_codepoint, 16)
+    #         except ValueError:
+    #             return None
+        
+    #     return code
+    #     # Convert to Unicode character
+    #     # try:
+    #     #     return chr(code)
+    #     # except ValueError:
+    #     #     return None
+    def export_as_png(self,key, output_path='.',output_name=None, size=64, color='white',write=True,return_if_exists=False):
+        r"""
+        Export an icon as PNG from a font file using the codepoint.
+        
+        Args:
+            key (str): Icon identifier (for naming)
+            codepoint (str): Unicode codepoint (e.g., "\e16d", "\F1B97")
+            font_path (str): Path to .ttf or .otf font file
+            output_path (str): Directory or full path for output PNG
+            size (int): Icon size in pixels
+            color (tuple): RGB color tuple (0-255)
+        
+        Returns:
+            str: Path to the generated PNG file
+        """
+        # Determine output filename
+        if os.path.isdir(output_path):
+            if output_name!=None:
+                output_file = os.path.join(output_path, f"{output_name}.png")
+            else:
+                output_file = os.path.join(output_path, f"{key}.png")
+        else:
+            output_file = output_path
+            # Create directory if it doesn't exist
+            os.makedirs(os.path.dirname(output_file), exist_ok=True)
+        from PIL import Image, ImageDraw, ImageFont
+
+        if return_if_exists and os.path.exists(output_file):
+            # print('Already exists, don\'t overwrite')
+            if write:
+                return output_file
+            else:
+                return Image(output_file)
+
+
+        try:
+            key,font_path=self._key_and_ttf(key)
+            codepoint = self.get_val_from_css(key)
+            
+            # Convert codepoint string to actual Unicode character
+            char = chr(codepoint)
+            
+            if not char:
+                raise ValueError(f"Invalid codepoint: {codepoint}")
+            
+            color=tuple([round(ci*255) for ci in resolve_color(color)])
+
+            # Load font
+            font = ImageFont.truetype(font_path, size)
+            
+            # Calculate text size
+            bbox = font.getbbox(char)
+            text_width = bbox[2] - bbox[0]
+            text_height = bbox[3] - bbox[1]
+            
+            # Create image with some padding
+            padding = size // 4
+            # img_size = max(text_width, text_height) + padding * 2
+            
+            img_size = size
+            image = Image.new('RGBA', (img_size, img_size), (0, 0, 0, 0))
+            draw = ImageDraw.Draw(image)
+            
+            # Calculate position to center the icon
+            x = (img_size - text_width) // 2 - bbox[0]
+            y = (img_size - text_height) // 2 - bbox[1]
+            
+            # Draw the icon
+            draw.text((x, y), char, font=font, fill=color)  # Add alpha channel
+            
+            # Save as PNG
+            if write:
+                image.save(output_file, 'PNG')
+                return output_file
+            else:
+                return image
+            
+        except Exception as e:
+            raise Exception(f"Failed to export icon '{key}': {str(e)}")
 # icons_material=infinite()
 mdi= IconFont({
     'regular': os.path.join(SK_PATH,'skdata/fonts/mdi/fonts/materialdesignicons-webfont.ttf')
     },
-    css_dir=os.path.join(SK_PATH,'skdata/fonts/mdi/css/materialdesignicons.css')
+    css_dir=os.path.join(SK_PATH,'skdata/fonts/mdi/css/materialdesignicons.css'),
+    prepend='mdi-'
     )
-mdi.prepend=('mdi-')
+# mdi.prepend=('mdi-')
 # print('hell')
 
 
 class FileCategory:
 
-    def __init__(self, icon, extensions, size=20):
+    def __init__(self, icon, extensions, size=20, name=''):
         self._exts = set()
         self._edef = {}
         self._resolved = {}
         self.size = size
         self.icon = icon
+        self.name=name
         for e in extensions:
             if isinstance(e, str):
                 self._exts.add(e)
@@ -926,10 +1596,18 @@ class FileCategory:
             ic = mdi(iargs[0], color=iargs[1], size=self.size)
         self._resolved[iargs] = ic
         return ic
+    def get_icon_def(self, k):
+        iargs = self.__getitem__(k)
+        # try:
+        #     iargs = self.__getitem__(k)
+        # except:
+        #     iargs=self.icon
+        return iargs
 
 
 class FileIconFinder:
     _resolved = {}
+    _resolved_cat = {}
 
     def __init__(self, default_icon, size=None):
         if size == None:
@@ -944,6 +1622,7 @@ class FileIconFinder:
         # Define your icon categories and subcategories here
         self.icon_categories = {
             "common_paths":FileCategory(
+                name='common_paths',
                 icon=('folder','#FFD96C'),
                 extensions=(
                     ('folder','folder','#FFD96C'),
@@ -962,8 +1641,16 @@ class FileIconFinder:
                     ('sync','sync','#2196F3')
                     )
                 ),
+            "none":FileCategory(
+                name='none',
+                icon=('file-question'),
+                extensions=(
+                    ('folder','folder-question')
+                    )
+                ),
             # Images
             "raster_images": FileCategory(
+                name='raster_images',
                 extensions=(
                     # Standard formats (lossy)
                     ".jpg",
@@ -1022,6 +1709,7 @@ class FileIconFinder:
                 icon=("image-outline","#148ED7"),  # Simple image icon
             ),
             "layered_images": FileCategory(
+                name='layered_images',
                 extensions=(
                     # Professional editors
                     ".psd",
@@ -1051,6 +1739,7 @@ class FileIconFinder:
                 icon=("image-edit","#148ED7")
             ),
             "vector_images": FileCategory(
+                name='vector_images',
                 extensions=(
                     # Standard vector formats
                     ".svg",
@@ -1089,6 +1778,7 @@ class FileIconFinder:
             ),
             # CAD (Expanded)
             "cad": FileCategory(
+                name='cad',
                 extensions=(
                     ".dwg",
                     ".dxf",
@@ -1134,6 +1824,7 @@ class FileIconFinder:
             ),
             # CAM & 3D Printing
             "cam": FileCategory(
+                name='cam',
                 extensions=(
                     ".gcode",
                     ".nc",
@@ -1165,6 +1856,7 @@ class FileIconFinder:
             ),
             # CAE & Simulation
             "cae": FileCategory(
+                name='cae',
                 extensions=(
                     ".inp",
                     ".dat",
@@ -1204,6 +1896,7 @@ class FileIconFinder:
             
             # PLM & PDM
             "plm": FileCategory(
+                name='plm',
                 extensions=(
                     ".wgm",
                     ".wht",
@@ -1222,6 +1915,7 @@ class FileIconFinder:
             ),
             # Mesh & Point Cloud
             "mesh": FileCategory(
+                name='mesh',
                 extensions=(
                     ".ply",
                     ".pcd",
@@ -1260,6 +1954,7 @@ class FileIconFinder:
             ),
             # Documents (General)
             "documents": FileCategory(
+                name='documents',
                 extensions=(
                     ".doc",
                     ".docx",
@@ -1299,6 +1994,7 @@ class FileIconFinder:
             ),
             # PDFs
             "pdfs": FileCategory(
+                name='pdfs',
                 extensions=(
                     ".pdf",
                     ".fdf",
@@ -1314,6 +2010,7 @@ class FileIconFinder:
             ),
             # Spreadsheets
             "spreadsheets": FileCategory(
+                name='spreadsheets',
                 extensions=(
                     ".xls",
                     ".xlsx",
@@ -1359,6 +2056,7 @@ class FileIconFinder:
             ),
             # Presentations
             "presentations": FileCategory(
+                name='presentations',
                 extensions=(
                     ".ppt",
                     ".pptx",
@@ -1396,12 +2094,14 @@ class FileIconFinder:
                 icon=("shape",(1.0, 0.5, 0.4)),
             ),
             'plugins': FileCategory(
+                name='plugins',
                 extensions=(
                     '.vsix',
                     ),
                 icon=('puzzle',(.8,.8,.8))
                 ),
             'disk_image_archives': FileCategory(
+                name='disk_image_archives',
                 extensions=(
                     # CD/DVD/Blu-ray Images
                     '.iso', '.bin', '.cue', '.mdf', '.mds', '.img', '.ccd', '.sub', '.nrg',
@@ -1421,6 +2121,7 @@ class FileIconFinder:
             
             # Archives
             "archives": FileCategory(
+                name='archives',
                 extensions=(
                     ".rar",
                     (".zip","folder-zip",(0.8, 0.6, 0.3)),
@@ -1491,6 +2192,7 @@ class FileIconFinder:
             ),
             # Shortcuts & Links
             "shortcuts": FileCategory(
+                name='shortcuts',
                 extensions=(
                     (".url",'link-variant',(0.9, 0.9, 0.9)),
                     ".lnk",
@@ -1508,6 +2210,7 @@ class FileIconFinder:
             # Add more categories as needed...
             # (Previous categories for audio, video, code, etc. can be included similarly)
             "audio": FileCategory(
+                name='audio',
                 extensions=(
                     ".mp3",
                     ".wav",
@@ -1590,6 +2293,7 @@ class FileIconFinder:
                 icon=("file-music",(0.5, 0.8, 1.0)),
             ),
             "video": FileCategory(
+                name='video',
                 extensions=(
                     ".mp4",
                     ".avi",
@@ -1674,6 +2378,7 @@ class FileIconFinder:
             ),
             # Engineering Documents
             "engineering_docs": FileCategory(
+                name='engineering_docs',
                 extensions=(
                     ".idw",
                     ".dwt",
@@ -1718,6 +2423,7 @@ class FileIconFinder:
                 icon=("file-cog",(0.1, 0.6, 0.85)),
             ),
             "virtualization": FileCategory(
+                name='virtualization',
                 extensions=(
                     ".vmdk",
                     ".vdi",
@@ -1771,6 +2477,7 @@ class FileIconFinder:
                 icon=("server",(0.4, 0.9, 0.8)),
             ),
             "fonts": FileCategory(
+                name='fonts',
                 extensions=(
                     ".ttf",
                     ".otf",
@@ -1813,6 +2520,7 @@ class FileIconFinder:
                 icon=("format-font",(1.0, 0.8, 0.4)),
             ),
             "ebooks": FileCategory(
+                name='ebooks',
                 extensions=(
                     ".epub",
                     ".mobi",
@@ -1873,6 +2581,7 @@ class FileIconFinder:
                 icon=("book-open-variant",(0.7, 0.5, 0.95)),
             ),
             "temp": FileCategory(
+                name='temp',
                 extensions=(
                     ".tmp",
                     ".temp",
@@ -1914,6 +2623,7 @@ class FileIconFinder:
                 icon=("file-clock-outline",(0.8, 0.8, 0.8)),
             ),
             "logs": FileCategory(
+                name='logs',
                 extensions=(
                     ".log",
                     ".txt",
@@ -1960,6 +2670,7 @@ class FileIconFinder:
             ),
             # General code
             "code":FileCategory(
+                name='code',
                 extensions=(
                     ".ees"
                     ),
@@ -1967,71 +2678,83 @@ class FileIconFinder:
                 ),
             # Python
             'python': FileCategory(
+                name='python',
                 extensions=('.py', '.pyc', '.pyo', '.pyd', '.pyi', '.pyw', '.pyz', '.pyzw', '.pyt', '.whl', '.egg'),
                 icon=('language-python','#519ABA')
             ),
 
             # JavaScript/TypeScript
             'javascript': FileCategory(
+                name='javascript',
                 extensions=('.js', '.jsx', '.mjs', '.cjs', '.ts', '.tsx', '.mts', '.cts', '.es', '.es6', '.pac'),
                 icon='language-javascript'
             ),
 
             # Java/Kotlin/Scala (JVM)
             'jvm': FileCategory(
+                name='jvm',
                 extensions=('.java', '.class', '.jar', '.war', '.ear', '.jmod', '.jks', '.kt', '.kts', '.scala', '.sc'),
                 icon='language-java'
             ),
 
             # C/C++
             'cpp': FileCategory(
+                name='cpp',
                 extensions=('.c', '.h', '.cpp', '.hpp', '.cc', '.cxx', '.hxx', '.ii', '.inl', '.ipp', '.ixx', '.c++', '.h++', '.cu', '.cuh'),
                 icon='language-cpp'
             ),
 
             # Rust
             'rust': FileCategory(
+                name='rust',
                 extensions=('.rs', '.rlib', '.rustc', '.toml'),  # Cargo.toml is included here
                 icon='language-rust'
             ),
 
             # Go
             'go': FileCategory(
+                name='go',
                 extensions=('.go', '.mod', '.sum', '.work'),
                 icon='language-go'
             ),
 
             # Ruby
             'ruby': FileCategory(
+                name='ruby',
                 extensions=('.rb', '.rbw', '.gemspec', '.rake', '.ru', '.erb', '.rbs'),
                 icon='language-ruby'
             ),
 
             # PHP
             'php': FileCategory(
+                name='php',
                 extensions=('.php', '.phtml', '.php3', '.php4', '.php5', '.php7', '.phps', '.phar', '.inc'),
                 icon='language-php'
             ),
 
             # Swift
             'swift': FileCategory(
+                name='swift',
                 extensions=('.swift', '.swiftinterface', '.swiftmodule', '.swiftsourceinfo'),
                 icon='language-swift'
             ),
 
             # R
             'r': FileCategory(
+                name='r',
                 extensions=('.r', '.R', '.Rdata', '.Rds', '.Rda', '.Rhistory', '.Rprofile', '.Renviron'),
                 icon='language-r'
             ),
 
             # Haskell
             'haskell': FileCategory(
+                name='haskell',
                 extensions=('.hs', '.lhs', '.cabal', '.hsc'),
                 icon='lambda'
             ),
             # HTML
             "html": FileCategory(
+                name='html',
                 extensions=(
                     ".html",
                     ".htm",
@@ -2047,6 +2770,7 @@ class FileIconFinder:
             ),
             # CSS/Sass
             "css": FileCategory(
+                name='css',
                 extensions=(
                     ".css",
                     ".scss",
@@ -2060,6 +2784,7 @@ class FileIconFinder:
             ),
             # Web Templates
             "templates": FileCategory(
+                name='templates',
                 extensions=(
                     ".ejs",
                     ".pug",
@@ -2075,6 +2800,7 @@ class FileIconFinder:
             ),
             # Package Managers
             "packages": FileCategory(
+                name='packages',
                 extensions=(
                     ".json",
                     ".lock",
@@ -2090,6 +2816,7 @@ class FileIconFinder:
             ),
             # Build Tools
             "build": FileCategory(
+                name='build',
                 extensions=(
                     ".gradle",
                     ".pom",
@@ -2105,6 +2832,7 @@ class FileIconFinder:
             ),
             # CI/CD
             "ci": FileCategory(
+                name='ci',
                 extensions=(
                     ".yml",
                     ".yaml",
@@ -2119,6 +2847,7 @@ class FileIconFinder:
             ),
             # SQL
             "sql": FileCategory(
+                name='sql',
                 extensions=(
                     ".sql",
                     ".ddl",
@@ -2140,6 +2869,7 @@ class FileIconFinder:
             ),
             # Shell Scripts
             "shell": FileCategory(
+                name='shell',
                 extensions=(
                     ".sh",
                     ".bash",
@@ -2157,6 +2887,7 @@ class FileIconFinder:
             ),
             # Notebooks
             "notebooks": FileCategory(
+                name='notebooks',
                 extensions=(
                     ".ipynb",
                     ".rmd",
@@ -2172,6 +2903,7 @@ class FileIconFinder:
             ),
             # Assembly
             "assembly": FileCategory(
+                name='assembly',
                 extensions=(
                     ".asm",
                     ".s",
@@ -2187,6 +2919,7 @@ class FileIconFinder:
             ),
             # Embedded
             "embedded": FileCategory(
+                name='embedded',
                 extensions=(
                     ".hex",
                     ".bin",
@@ -2208,6 +2941,7 @@ class FileIconFinder:
             ),
             # Dotfiles/Configs
             "config": FileCategory(
+                name='config',
                 extensions=(
                     ".env",
                     ".gitignore",
@@ -2223,6 +2957,7 @@ class FileIconFinder:
             ),
             # Containers/VMs
             "containers": FileCategory(
+                name='containers',
                 extensions=(
                     ".dockerfile",
                     ".dockerignore",
@@ -2235,6 +2970,7 @@ class FileIconFinder:
                 icon=("docker",(0.3, 0.95, 0.95)),
             ),
             "apps": FileCategory(
+                name='apps',
                 extensions=(
                     # Windows
                     ".exe",
@@ -2274,6 +3010,7 @@ class FileIconFinder:
                 icon=("application-export",(0.2, 0.9, 0.6)),  # or 'application' for a simpler icon
             ),
             "installers": FileCategory(
+                name='installers',
                 extensions=(
                     # Windows
                     ".msi",
@@ -2315,6 +3052,7 @@ class FileIconFinder:
                 icon=("package-down",(0.8, 0.4, 0.8)),
             ),
             "system_libs": FileCategory(
+                name='system_libs',
                 extensions=(
                     ".dll",
                     ".so",
@@ -2345,6 +3083,7 @@ class FileIconFinder:
                 icon=("file-cog-outline",'#D4E7FC'),
             ),
             "disk_images": FileCategory(
+                name='disk_images', 
                 extensions=(
                     ".iso",
                     ".img",
@@ -2380,6 +3119,7 @@ class FileIconFinder:
                 icon=("harddisk",(0.7, 0.7, 0.8)),
             ),
             "system_config": FileCategory(
+                name='system_config',
                 extensions=(
                     ".reg",
                     ".inf",
@@ -2413,6 +3153,7 @@ class FileIconFinder:
                 icon=("cog-sync",(0.7, 0.7, 1.0)),
             ),
             "firmware": FileCategory(
+                name='firmware',
                 extensions=(
                     ".rom",
                     ".bin",
@@ -2442,6 +3183,7 @@ class FileIconFinder:
                 icon=("chip",(0.4, 0.4, 0.9)),
             ),
             "cursors": FileCategory(
+                name='cursors',
                 icon=('button-cursor'),
                 extensions=('.cur')
                 )
@@ -2461,6 +3203,19 @@ class FileIconFinder:
                     self._resolved[v] = ic
                     return ic
             return self.default_icon
+    def get_category(self,v):
+        v = v.lower()
+        try:
+            return self._resolved_cat[v]
+        except:
+            for k, cat in self.icon_categories.items():
+                if v in cat:
+                    ic = cat.get(v)
+                    self._resolved[v] = ic
+                    self._resolved_cat[v] = cat
+                    return cat
+            return self.icon_categories['none']
+
 
 
 def remove_duplicates_fast(lst):
@@ -2514,9 +3269,11 @@ class BrowserHistory:
     def print(self):
         print(self.history)
 
+
 class NavigationHistory:
     def __init__(self, max_size=50):
         self.back_stack = []       # Stack for backward navigation
+        self.back_stack_as_dict={}
         self.current = None        # Current location
         self.forward_stack = []    # Stack for forward navigation
         self.max_size = max_size   # Maximum history size
@@ -2524,6 +3281,9 @@ class NavigationHistory:
     
     def visit(self, location, is_navigation=False):
         """Add a new location to history"""
+        if isinstance(location,tuple):
+            if len(location)==2 and location[1]!=None:
+                self.back_stack_as_dict[location[0]]=location[1]
         if self.current == location:
             return  # Don't do anything if same location
         
@@ -2593,88 +3353,451 @@ class NavigationHistory:
 import random
 from collections import deque
 
+# class PlaylistManager:
+#     def __init__(self):
+#         self.playlist_set = set()        # Set to store unique elements (e.g., music tracks)
+#         self.playlist_order = deque()    # Deque to maintain the order of playlist elements
+#         self.current_track = None        # Pointer to the current track
+
+#     def insert(self, track):
+#         """Insert a new track into the playlist (if not already present)"""
+#         if track not in self.playlist_set:
+#             self.playlist_set.add(track)
+#             self.playlist_order.append(track)
+#             if self.current_track is None:
+#                 self.current_track = track
+
+#     def add_to_queue(self, track):
+#         """Add a track to the end of the playlist queue"""
+#         if track not in self.playlist_set:
+#             self.playlist_set.add(track)
+#             self.playlist_order.append(track)
+
+#     def add_after_current(self, track):
+#         """Add a track after the current track in the playlist"""
+#         if track not in self.playlist_set:
+#             if self.current_track is not None and self.current_track in self.playlist_set:
+#                 current_index = self.playlist_order.index(self.current_track)
+#                 self.playlist_order.insert(current_index + 1, track)
+#                 self.playlist_set.add(track)
+
+#     def remove(self, track):
+#         """Remove a track from the playlist"""
+#         if track in self.playlist_set:
+#             self.playlist_set.remove(track)
+#             self.playlist_order.remove(track)
+
+#     def get_current_track(self):
+#         """Get the current track"""
+#         return self.current_track
+
+#     def set_current_track(self, track):
+#         """Set the current track"""
+#         if track in self.playlist_set:
+#             self.current_track = track
+
+#     def shuffle(self):
+#         """Shuffle the playlist order"""
+#         random.shuffle(self.playlist_order)
+
+#     def unshuffle(self):
+#         """Restore the playlist order to its original state"""
+#         self.playlist_order = deque(sorted(self.playlist_order, key=lambda x: self.playlist_order.index(x)))
+
+#     def next_track(self):
+#         """Move to the next track in the playlist"""
+#         if self.current_track is not None and self.current_track in self.playlist_set:
+#             try:
+#                 current_index = self.playlist_order.index(self.current_track)
+#                 next_track = self.playlist_order[current_index + 1]
+#                 self.current_track = next_track
+#                 return next_track
+#             except IndexError:
+#                 print("End of playlist reached.")
+#         else:
+#             print("No current track set.")
+
+#     def prev_track(self):
+#         """Move to the previous track in the playlist"""
+#         if self.current_track is not None and self.current_track in self.playlist_set:
+#             try:
+#                 current_index = self.playlist_order.index(self.current_track)
+#                 prev_track = self.playlist_order[current_index - 1]
+#                 self.current_track = prev_track
+#                 return prev_track
+#             except IndexError:
+#                 print("Start of playlist reached.")
+#         else:
+#             print("No current track set.")
+
+#     def print_playlist(self):
+#         """Print the current playlist order"""
+#         print("Playlist Order:")
+#         for idx, track in enumerate(self.playlist_order, start=1):
+#             print(f"{idx}. {track}")
+
+
+import random
+from collections import deque
+from typing import List, Optional, Iterator, Callable, Dict, Any
+
 class PlaylistManager:
-    def __init__(self):
-        self.playlist_set = set()        # Set to store unique elements (e.g., music tracks)
+    def __init__(self, initial_tracks: Optional[List[str]] = None, loop_enabled: bool = False):
+        """
+        Initialize the playlist manager with optional initial tracks and loop setting.
+        
+        Args:
+            initial_tracks: List of tracks to populate the playlist with on initialization
+            loop_enabled: Whether to loop to beginning when reaching the end of playlist
+        """
+        self.playlist_set = set()        # Set to store unique elements
         self.playlist_order = deque()    # Deque to maintain the order of playlist elements
         self.current_track = None        # Pointer to the current track
+        self._original_order = deque()   # Backup for unshuffle functionality
+        self.loop_enabled = loop_enabled # Whether looping is enabled
+        
+        # Callback storage
+        self._callbacks: Dict[str, List[Callable]] = {
+            'on_next_track': [],
+            'on_prev_track': [],
+            'on_playlist_end': [],
+            'on_playlist_start': [],
+            'on_track_changed': [],
+            'on_track_added': [],
+            'on_track_removed': [],
+            'on_playlist_cleared': [],
+            'on_playlist_shuffled': [],
+            'on_playlist_unshuffled': [],
+            'on_loop_toggled': []
+        }
+        
+        if initial_tracks:
+            self.populate(initial_tracks)
 
-    def insert(self, track):
-        """Insert a new track into the playlist (if not already present)"""
+    def bind(self, event: str, callback: Callable) -> None:
+        """
+        Bind a callback function to a playlist event.
+        
+        Args:
+            event: Event name to bind to (e.g., 'on_next_track', 'on_playlist_end')
+            callback: Function to call when event occurs
+                     Callback signature: callback(playlist_manager, *args, **kwargs)
+        """
+        if event in self._callbacks:
+            self._callbacks[event].append(callback)
+        else:
+            raise ValueError(f"Unknown event: {event}. Available events: {list(self._callbacks.keys())}")
+
+    def unbind(self, event: str, callback: Callable) -> None:
+        """
+        Remove a callback function from a playlist event.
+        
+        Args:
+            event: Event name to unbind from
+            callback: Function to remove
+        """
+        if event in self._callbacks and callback in self._callbacks[event]:
+            self._callbacks[event].remove(callback)
+
+    def _trigger_callbacks(self, event: str, *args, **kwargs) -> None:
+        """Trigger all callbacks for a given event"""
+        for callback in self._callbacks.get(event, []):
+            try:
+                callback(self, *args, **kwargs)
+            except Exception as e:
+                print(f"Error in callback for event {event}: {e}")
+
+    def enable_loop(self) -> None:
+        """Enable playlist looping"""
+        if not self.loop_enabled:
+            self.loop_enabled = True
+            self._trigger_callbacks('on_loop_toggled', True)
+
+    def disable_loop(self) -> None:
+        """Disable playlist looping"""
+        if self.loop_enabled:
+            self.loop_enabled = False
+            self._trigger_callbacks('on_loop_toggled', False)
+
+    def toggle_loop(self) -> bool:
+        """Toggle looping enabled/disabled"""
+        self.loop_enabled = not self.loop_enabled
+        self._trigger_callbacks('on_loop_toggled', self.loop_enabled)
+        return self.loop_enabled
+
+    def is_looping(self) -> bool:
+        """Check if looping is enabled"""
+        return self.loop_enabled
+
+    def append(self, track: str) -> bool:
+        """
+        Add a track to the end of the playlist (if not already present)
+        
+        Returns:
+            bool: True if track was added, False if it already exists
+        """
         if track not in self.playlist_set:
             self.playlist_set.add(track)
             self.playlist_order.append(track)
+            self._original_order.append(track)
             if self.current_track is None:
                 self.current_track = track
+            self._trigger_callbacks('on_track_added', track)
+            return True
+        return False
 
-    def add_to_queue(self, track):
-        """Add a track to the end of the playlist queue"""
-        if track not in self.playlist_set:
-            self.playlist_set.add(track)
-            self.playlist_order.append(track)
-
-    def add_after_current(self, track):
-        """Add a track after the current track in the playlist"""
+    def insert_after_current(self, track: str) -> bool:
+        """Insert a track after the current track in the playlist"""
         if track not in self.playlist_set:
             if self.current_track is not None and self.current_track in self.playlist_set:
                 current_index = self.playlist_order.index(self.current_track)
                 self.playlist_order.insert(current_index + 1, track)
+                # Update original order by finding where to insert
+                orig_index = self._original_order.index(self.current_track)
+                self._original_order.insert(orig_index + 1, track)
                 self.playlist_set.add(track)
+                self._trigger_callbacks('on_track_added', track)
+                return True
+        return False
 
-    def remove(self, track):
+    def insert_at_position(self, track: str, position: int) -> bool:
+        """
+        Insert a track at a specific position in the playlist
+        
+        Args:
+            track: Track to insert
+            position: Index position (0-based) to insert at
+            
+        Returns:
+            bool: True if inserted, False if invalid position or track exists
+        """
+        if track in self.playlist_set:
+            return False
+            
+        if position < 0 or position > len(self.playlist_order):
+            return False
+            
+        self.playlist_set.add(track)
+        self.playlist_order.insert(position, track)
+        self._original_order.insert(position, track)
+        
+        # Set as current track if playlist was empty
+        if self.current_track is None:
+            self.current_track = track
+            
+        self._trigger_callbacks('on_track_added', track)
+        return True
+
+    def remove(self, track: str) -> bool:
         """Remove a track from the playlist"""
         if track in self.playlist_set:
             self.playlist_set.remove(track)
             self.playlist_order.remove(track)
+            self._original_order.remove(track)
+            
+            # Update current track if it was removed
+            if self.current_track == track:
+                self.current_track = self._get_next_available_track()
+                if self.current_track:
+                    self._trigger_callbacks('on_track_changed', self.current_track)
+            
+            self._trigger_callbacks('on_track_removed', track)
+            return True
+        return False
 
-    def get_current_track(self):
+    def clear(self) -> None:
+        """Clear the entire playlist"""
+        was_empty = self.is_empty()
+        self.playlist_set.clear()
+        self.playlist_order.clear()
+        self._original_order.clear()
+        self.current_track = None
+        
+        if not was_empty:
+            self._trigger_callbacks('on_playlist_cleared')
+
+    def populate(self, tracks: List[str], clear_existing: bool = True) -> None:
+        """
+        Populate the playlist with a list of tracks.
+        
+        Args:
+            tracks: List of tracks to add to the playlist
+            clear_existing: If True, clear existing playlist first
+        """
+        if clear_existing:
+            self.clear()
+        
+        for track in tracks:
+            self.append(track)
+
+    def get_current_track(self) -> Optional[str]:
         """Get the current track"""
         return self.current_track
 
-    def set_current_track(self, track):
+    def set_current_track(self, track: str) -> bool:
         """Set the current track"""
         if track in self.playlist_set:
+            old_track = self.current_track
             self.current_track = track
+            if old_track != track:
+                self._trigger_callbacks('on_track_changed', track)
+            return True
+        return False
 
-    def shuffle(self):
-        """Shuffle the playlist order"""
-        random.shuffle(self.playlist_order)
+    def shuffle(self) -> None:
+        """Shuffle the playlist order while preserving current track position"""
+        if len(self.playlist_order) <= 1:
+            return
+            
+        current_track_before_shuffle = self.current_track
+        
+        # Convert to list for shuffling, then back to deque
+        temp_list = list(self.playlist_order)
+        random.shuffle(temp_list)
+        self.playlist_order = deque(temp_list)
+        
+        # Restore current track to maintain playback continuity
+        if current_track_before_shuffle in self.playlist_set:
+            self.current_track = current_track_before_shuffle
+            
+        self._trigger_callbacks('on_playlist_shuffled')
 
-    def unshuffle(self):
+    def unshuffle(self) -> None:
         """Restore the playlist order to its original state"""
-        self.playlist_order = deque(sorted(self.playlist_order, key=lambda x: self.playlist_order.index(x)))
+        self.playlist_order = self._original_order.copy()
+        
+        # Ensure current track is still valid
+        if self.current_track not in self.playlist_set and self.playlist_order:
+            self.current_track = self.playlist_order[0]
+            self._trigger_callbacks('on_track_changed', self.current_track)
+            
+        self._trigger_callbacks('on_playlist_unshuffled')
 
-    def next_track(self):
+    def next_track(self) -> Optional[str]:
         """Move to the next track in the playlist"""
         if self.current_track is not None and self.current_track in self.playlist_set:
+            old_track = self.current_track
             try:
                 current_index = self.playlist_order.index(self.current_track)
                 next_track = self.playlist_order[current_index + 1]
                 self.current_track = next_track
+                self._trigger_callbacks('on_next_track', next_track, old_track)
+                self._trigger_callbacks('on_track_changed', next_track)
                 return next_track
             except IndexError:
-                print("End of playlist reached.")
-        else:
-            print("No current track set.")
+                # Handle end of playlist
+                if self.loop_enabled and self.playlist_order:
+                    # Loop to beginning
+                    self.current_track = self.playlist_order[0]
+                    self._trigger_callbacks('on_next_track', self.current_track, old_track)
+                    self._trigger_callbacks('on_track_changed', self.current_track)
+                    return self.current_track
+                else:
+                    # End of playlist reached, no looping - DON'T change current_track
+                    self._trigger_callbacks('on_playlist_end')
+                    return None
+        return None
 
-    def prev_track(self):
+    def prev_track(self) -> Optional[str]:
         """Move to the previous track in the playlist"""
         if self.current_track is not None and self.current_track in self.playlist_set:
+            old_track = self.current_track
             try:
                 current_index = self.playlist_order.index(self.current_track)
+                # Check if we're at the beginning (index 0)
+                if current_index == 0:
+                    raise IndexError("Start of playlist")
+                    
                 prev_track = self.playlist_order[current_index - 1]
                 self.current_track = prev_track
+                self._trigger_callbacks('on_prev_track', prev_track, old_track)
+                self._trigger_callbacks('on_track_changed', prev_track)
                 return prev_track
             except IndexError:
-                print("Start of playlist reached.")
-        else:
-            print("No current track set.")
+                # Handle start of playlist
+                if self.loop_enabled and self.playlist_order:
+                    # Loop to end
+                    self.current_track = self.playlist_order[-1]
+                    self._trigger_callbacks('on_prev_track', self.current_track, old_track)
+                    self._trigger_callbacks('on_track_changed', self.current_track)
+                    return self.current_track
+                else:
+                    # Start of playlist reached, no looping - DON'T change current_track
+                    self._trigger_callbacks('on_playlist_start')
+                    return None
+        return None
 
-    def print_playlist(self):
-        """Print the current playlist order"""
+    def get_playlist_length(self) -> int:
+        """Get the number of tracks in the playlist"""
+        return len(self.playlist_order)
+
+    def is_empty(self) -> bool:
+        """Check if the playlist is empty"""
+        return len(self.playlist_order) == 0
+
+    def contains(self, track: str) -> bool:
+        """Check if a track exists in the playlist"""
+        return track in self.playlist_set
+
+    def get_playlist_as_list(self) -> List[str]:
+        """Get the entire playlist as a list"""
+        return list(self.playlist_order)
+
+    def get_upcoming_tracks(self, count: int = 5) -> List[str]:
+        """Get the next few tracks in the playlist"""
+        if self.current_track is None or self.is_empty():
+            return []
+        
+        try:
+            current_index = self.playlist_order.index(self.current_track)
+            upcoming = list(self.playlist_order)[current_index + 1:current_index + 1 + count]
+            return upcoming
+        except (ValueError, IndexError):
+            return []
+
+    def move_track(self, track: str, new_position: int) -> bool:
+        """Move a track to a new position in the playlist"""
+        if track not in self.playlist_set:
+            return False
+            
+        if new_position < 0 or new_position >= len(self.playlist_order):
+            return False
+            
+        # Remove from current position
+        self.playlist_order.remove(track)
+        # Insert at new position
+        self.playlist_order.insert(new_position, track)
+        # Update original order as well
+        self._original_order.remove(track)
+        self._original_order.insert(new_position, track)
+        return True
+
+    def __iter__(self) -> Iterator[str]:
+        """Make the playlist iterable"""
+        return iter(self.playlist_order)
+
+    def __len__(self) -> int:
+        """Return the length of the playlist"""
+        return len(self.playlist_order)
+
+    def __contains__(self, track: str) -> bool:
+        """Check if track is in playlist using 'in' operator"""
+        return track in self.playlist_set
+
+    def print_playlist(self, show_current: bool = True) -> None:
+        """Print the current playlist order with optional current track highlighting"""
         print("Playlist Order:")
         for idx, track in enumerate(self.playlist_order, start=1):
-            print(f"{idx}. {track}")
+            marker = ">>> " if show_current and track == self.current_track else "    "
+            print(f"{marker}{idx}. {track}")
+        print(f"Looping: {'Enabled' if self.loop_enabled else 'Disabled'}")
+        print(f"Current Track: {self.current_track}")
+
+    def _get_next_available_track(self) -> Optional[str]:
+        """Get the next available track when current track is removed"""
+        if self.playlist_order:
+            return self.playlist_order[0]
+        return None
 
 def get_common_paths():
     """Returns a list of common paths available on the current platform."""
@@ -2839,6 +3962,29 @@ def get_files(*directories):
             if os.path.isfile(filepath):
                 files.append(filepath.replace('\\','/'))
     return files
+
+def get_folders_files(*directories):
+    '''
+    Get the folders and files in one or more directories. Skips empty strings. Returns two separate lists.
+    '''
+    folders=[]
+    files=[]
+    _unique=set()
+    for directory in directories:
+        if not isinstance(directory,Path):
+            directory=Path(directory)
+        if directory.exists():
+            for p in directory.iterdir():
+                if not p in _unique:
+                    if p.is_dir():
+                        folders.append(p)
+                    else:
+                        files.append(p)
+                    _unique.add(p)
+    return folders,files
+
+
+
 def text_between(string,first_delimiter,last_delimiter):
     btw=re.search(f'{first_delimiter}(.*){last_delimiter}', string)
     if btw:
@@ -3042,3 +4188,209 @@ def replace_module_imports(root_dir, old_module, new_module):
 # Example usage:
 # replace_module_imports(r"C:\Users\migue\.conda\envs\app\Lib\site-packages\sk_webview", 'webview', 'sk_webview')
 # print(time.time()-t0)
+
+
+import platform
+import sys
+import os
+
+def get_physical_screen_size():
+    """
+    Get physical screen dimensions without using Kivy or extra modules.
+    Works on Windows, Linux, macOS, and Android (via Pygame or OS).
+    Returns: (width, height) tuple
+    """
+    system = platform.system().lower()
+    
+    # Android detection
+    if hasattr(sys, 'getandroidapilevel'):
+        # We're on Android
+        return _get_android_screen_size()
+    
+    # Check common Android indicators
+    android_indicators = ['ANDROID_DATA', 'ANDROID_ROOT', 'ANDROID_HOME']
+    if any(os.getenv(indicator) for indicator in android_indicators):
+        return _get_android_screen_size()
+    
+    if system == "windows":
+        return _get_windows_screen_size()
+    elif system == "darwin":  # macOS
+        return _get_macos_screen_size()
+    elif system == "linux":
+        return _get_linux_screen_size()
+    else:
+        # Fallback for unknown platforms
+        return _get_fallback_screen_size()
+
+def _get_windows_screen_size():
+    """Get screen size on Windows using ctypes"""
+    try:
+        import ctypes
+        user32 = ctypes.windll.user32
+        return user32.GetSystemMetrics(0), user32.GetSystemMetrics(1)
+    except:
+        return _get_fallback_screen_size()
+
+def _get_linux_screen_size():
+    """Get screen size on Linux using xrandr or other methods"""
+    try:
+        # Try xrandr first
+        import subprocess
+        result = subprocess.run(['xrandr'], capture_output=True, text=True, timeout=5)
+        if result.returncode == 0:
+            for line in result.stdout.splitlines():
+                if ' connected' in line and '+' in line:
+                    # Extract resolution from line like: "   1920x1080     60.00*+"
+                    parts = line.split()
+                    for part in parts:
+                        if 'x' in part and '+' in part:
+                            resolution = part.split('+')[0]
+                            if 'x' in resolution:
+                                width, height = map(int, resolution.split('x'))
+                                return width, height
+    except:
+        pass
+    
+    try:
+        # Try using tkinter as fallback
+        import tkinter as tk
+        root = tk.Tk()
+        root.withdraw()  # Hide the window
+        width = root.winfo_screenwidth()
+        height = root.winfo_screenheight()
+        root.destroy()
+        return width, height
+    except:
+        return _get_fallback_screen_size()
+
+def _get_macos_screen_size():
+    """Get screen size on macOS"""
+    try:
+        import subprocess
+        # Try system_profiler
+        result = subprocess.run([
+            'system_profiler', 'SPDisplaysDataType'
+        ], capture_output=True, text=True, timeout=10)
+        
+        if result.returncode == 0:
+            for line in result.stdout.splitlines():
+                if 'Resolution' in line and 'x' in line:
+                    # Line like: "Resolution: 2560 x 1600"
+                    parts = line.split(':')[1].strip().split()
+                    if 'x' in parts:
+                        x_index = parts.index('x')
+                        width = int(parts[x_index - 1])
+                        height = int(parts[x_index + 1])
+                        return width, height
+    except:
+        pass
+    
+    try:
+        # Try using tkinter as fallback
+        import tkinter as tk
+        root = tk.Tk()
+        root.withdraw()
+        width = root.winfo_screenwidth()
+        height = root.winfo_screenheight()
+        root.destroy()
+        return width, height
+    except:
+        return _get_fallback_screen_size()
+
+def _get_android_screen_size():
+    """Get screen size on Android"""
+    try:
+        # Method 1: Try using Pygame if available (common on Android)
+        import pygame
+        pygame.init()
+        info = pygame.display.Info()
+        return info.current_w, info.current_h
+    except:
+        pass
+    
+    try:
+        # Method 2: Try using os.environ (some Android Python implementations)
+        width = os.environ.get('SCREEN_WIDTH')
+        height = os.environ.get('SCREEN_HEIGHT')
+        if width and height:
+            return int(width), int(height)
+    except:
+        pass
+    
+    try:
+        # Method 3: Try using subprocess with getprop or dumpsys
+        import subprocess
+        
+        # Try wm size
+        result = subprocess.run(['wm', 'size'], capture_output=True, text=True, timeout=5)
+        if result.returncode == 0:
+            for line in result.stdout.splitlines():
+                if 'Physical size' in line:
+                    # Format: "Physical size: 1080x1920"
+                    resolution = line.split(':')[1].strip()
+                    width, height = map(int, resolution.split('x'))
+                    return width, height
+    except:
+        pass
+    
+    # Final Android fallback - common mobile resolutions
+    return _get_fallback_screen_size()
+
+def _get_fallback_screen_size():
+    """Fallback method using tkinter or common defaults"""
+    try:
+        # Try tkinter (usually available on desktop Python)
+        import tkinter as tk
+        root = tk.Tk()
+        root.withdraw()
+        width = root.winfo_screenwidth()
+        height = root.winfo_screenheight()
+        root.destroy()
+        return width, height
+    except:
+        # Ultimate fallback - common screen sizes
+        # This is a guess, but better than nothing
+        return 1920, 1080
+
+# Usage example
+# if __name__ == "__main__":
+#     width, height = get_physical_screen_size()
+#     print(f"Physical screen size: {width} x {height}")
+    
+#     # You can also use it like this:
+#     screen_width, screen_height = get_physical_screen_size()
+#     print(f"Width: {screen_width}, Height: {screen_height}")
+
+
+# def fun_debug(name=None):
+#     name=[name]
+#     def fun_debug_decorator(func):
+#         if name[0]==None:
+#             name[0]=func.__name__
+#         def wrapper(*args,**kwargs):
+#             print('-'*40)
+#             print(name[0],':',args,kwargs)
+#             print('-'*40)
+#             result=func(*args,**kwargs)
+#             return result
+#     return fun_debug_decorator
+def fun_debug(func):
+    name=[func.__name__]
+    def wrapper(*args,**kwargs):
+        print('-'*40)
+        print(name[0],':',args,kwargs)
+        result=func(*args,**kwargs)
+        print('-->',result)
+        print('-'*40)
+        return result
+    return wrapper
+
+def slugify(text):
+    """
+    Converts a string into a URL-friendly slug.
+    """
+    text = str(text).lower()  # Convert to string and lowercase
+    text = re.sub(r'[^\w\s-]', '', text)  # Remove non-word characters (except spaces and hyphens)
+    text = re.sub(r'[\s_-]+', '-', text)  # Replace spaces and multiple hyphens/underscores with a single hyphen
+    text = text.strip('-')  # Remove leading/trailing hyphens
+    return text

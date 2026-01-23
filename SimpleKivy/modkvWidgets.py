@@ -1,5 +1,13 @@
+from kivy.uix.recycleview import RecycleView as kvRecycleView
+import tempfile
 import io
+import pathlib
 from kivy.lang import Builder
+
+class RecycleView(kvRecycleView):
+    def select_with_key(self,index,key='up'):
+        self.select(index)
+        self.dispatch('on_key_released',self,key)
 
 # __created__={}
 
@@ -197,7 +205,8 @@ from .utils import colors,abc
 
 from kivy.metrics import inch
 from kivy.utils import boundary, platform
-from kivy.uix.behaviors import FocusBehavior
+# from kivy.uix.behaviors import FocusBehavior
+from .kvBehaviors import FocusBehavior
 
 from kivy.core.text import Label, DEFAULT_FONT
 from kivy.graphics import Color, Rectangle, PushMatrix, PopMatrix, Callback
@@ -1236,10 +1245,15 @@ class TextInput(FocusBehavior, Widget):
     def pgmove_speed(self):
         """how much vertical distance hitting pg_up or pg_down will move
         """
-        return int(
-            self.height
-            / (self.line_height + self.line_spacing) - 1
-        )
+        try:
+            return int(
+                self.height
+                / (self.line_height + self.line_spacing) - 1
+            )
+        except:
+            return int(
+                self.height/ (1e-9) - 1
+            )
 
     def _move_cursor_up(self, col, row, control=False, alt=False):
         if self.multiline and control:
@@ -1398,14 +1412,21 @@ class TextInput(FocusBehavior, Widget):
         cursor_x = x - self.x
         scroll_y = self.scroll_y
         scroll_x = self.scroll_x
-        scroll_y = scroll_y / dy if scroll_y > 0 else 0
+        scroll_y = scroll_y / dy if scroll_y > 0 and dy!=0 else 0
 
         cursor_y = (self.top - padding_top + scroll_y * dy) - y
-        cursor_y = int(boundary(
-            round(cursor_y / dy - 0.5),
-            0,
-            len(lines) - 1
-        ))
+        try:
+            cursor_y = int(boundary(
+                round(cursor_y / dy - 0.5),
+                0,
+                len(lines) - 1
+            ))
+        except:
+            cursor_y = int(boundary(
+                round(cursor_y / 1e-9 - 0.5),
+                0,
+                len(lines) - 1
+            ))
 
         get_text_width = self._get_text_width
         tab_width = self.tab_width
@@ -2412,9 +2433,14 @@ class TextInput(FocusBehavior, Widget):
 
         # adjust size/texcoord according to viewport
         if viewport_pos:
-            tcx, tcy = viewport_pos
-            tcx = tcx / texture_width * original_width
-            tcy = tcy / texture_height * original_height
+            try:
+                tcx, tcy = viewport_pos
+                tcx = tcx / texture_width * original_width
+                tcy = tcy / texture_height * original_height
+            except:
+                tcx, tcy = viewport_pos
+                tcx = tcx /( 1e-9 )* original_width
+                tcy = tcy / (1e-9) * original_height
 
         else:
             tcx, tcy = 0, 0
@@ -2423,8 +2449,13 @@ class TextInput(FocusBehavior, Widget):
             tcw = tcw - tcx
             texture_width = tcw * texture_width
         elif viewport_width < texture_width:
-            tcw = (viewport_width / texture_width) * tcw
-            texture_width = viewport_width
+            try:
+                tcw = (viewport_width / texture_width) * tcw
+                texture_width = viewport_width
+            except:
+                tcw = (viewport_width / 1e-9) * tcw
+                texture_width = viewport_width
+
 
         if viewport_height < texture_height:
             tch = (viewport_height / texture_height) * tch
@@ -3079,7 +3110,7 @@ class TextInput(FocusBehavior, Widget):
 
     def _bind_keyboard(self):
         super()._bind_keyboard()
-        Window.bind(on_textedit=self.window_on_textedit)
+        utils.Window.bind(on_textedit=self.window_on_textedit)
 
     def _unbind_keyboard(self):
         super()._unbind_keyboard()
@@ -4488,8 +4519,8 @@ def __getattr__(name):
 
         class SpinnerOptionB(utils.SpinnerOption):
             # bcolor = ListProperty([0, 0, 0, 0])
-            lcolor = ListProperty([0, .75, .75, 1])
-            color=ListProperty([0,0,0,1])
+            lcolor = ColorProperty([0, .75, .75, 1])
+            color=ColorProperty([0,0,0,1])
             lwidth=NumericProperty(2)
             # markup=BooleanProperty(False)
         return SpinnerOptionB
@@ -4617,8 +4648,31 @@ Loader = None
 
 class Image(Widget):
     '''Image class, see module documentation for more information.'''
-
-    source = StringProperty(None)
+    async_load=BooleanProperty(False)
+    # source = StringProperty(None)
+    _source=None
+    def _gsource(self):
+        return self._source
+    def _ssource(self,val):
+        if isinstance(val,str):
+            self._source=val
+        elif isinstance(val,pathlib.Path):
+            self._source=str(val.resolve())
+        else:
+            # data = io.BytesIO()
+            # val.save(data, format='png')
+            # data.seek(0)
+            # self.texture=CoreImage(BytesIO(data.read()), ext='png').texture
+            try:
+                with tempfile.NamedTemporaryFile(delete=True) as temp_file:
+                    temp_path=temp_file.name
+                val.save(temp_path, format="PNG")
+                self._source=temp_path
+            except:
+                ValueError('Image source error, value assumed to be a PIL Image object.')
+            
+        return True
+    source=AliasProperty(_gsource,_ssource)
     '''Filename / source of your image.
 
     :attr:`source` is a :class:`~kivy.properties.StringProperty` and
@@ -4991,6 +5045,13 @@ class AsyncImage(Image):
         :attr:`anim_loop` and :attr:`mipmap` and setting those properties will
         have no effect.
     '''
+    async_load=BooleanProperty(True)
+
+    # loading_image=StringProperty(resource_find('image-loading.gif'))
+    loading_image=StringProperty(None)
+    error_image=StringProperty(None)
+    preload_uri_callback=ObjectProperty(None,allownone=True)
+    loaded_callback=ObjectProperty(None,allownone=True)
 
     __events__ = ('on_error', 'on_load')
 
@@ -5003,8 +5064,15 @@ class AsyncImage(Image):
         self.fbind('source', self._load_source)
         super().__init__(**kwargs)
 
+        if self.loading_image!=None:
+            Loader.loading_image=self.loading_image
+        if self.error_image!=None:
+            Loader.error_image=self.error_image
+
     def _load_source(self, *args):
+        # print(args,self.loaded_callback)
         source = self.source
+
         if not source:
             self._clear_core_image()
             return
@@ -5014,12 +5082,18 @@ class AsyncImage(Image):
                 Logger.error('AsyncImage: Not found <%s>' % self.source)
                 self._clear_core_image()
                 return
+        else:
+            if self.preload_uri_callback:
+                _source=self.preload_uri_callback(source)
+                if _source:
+                    self.source=_source
+                    return
         self._found_source = source
         self._coreimage = image = Loader.image(
             source,
             nocache=self.nocache,
             mipmap=self.mipmap,
-            anim_delay=self.anim_delay
+            anim_delay=self.anim_delay,
         )
         image.bind(
             on_load=self._on_source_load,
@@ -5029,11 +5103,14 @@ class AsyncImage(Image):
         self.texture = image.texture
 
     def _on_source_load(self, value):
+        # print('hell')
         image = self._coreimage.image
         if not image:
             return
         self.texture = image.texture
         self.dispatch('on_load')
+        if self.loaded_callback:
+            self.loaded_callback(self)
 
     def _on_source_error(self, instance, error=None):
         self.dispatch('on_error', error)
