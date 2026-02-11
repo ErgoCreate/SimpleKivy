@@ -16,6 +16,20 @@ from typing import List, Optional
 _did_auto_config=False
 
 NOTKEY=-67191210201
+size_pos_kargs={'size','size_hint','size_hint_x','size_hint_y','width','height','pos','pos_hint'}
+def kwargs_extract_size_pos(kwargs_dict,inplace=True):
+    ''' Extracts size and position arguments from a kwargs_dict. Performs inplace removal by default.
+    '''
+    size_pos_args={}
+    remove=set()
+    for k,w in kwargs_dict.items():
+        if k in size_pos_kargs:
+            size_pos_args[k]=kwargs_dict.get(k)
+            remove.add(k)
+    if inplace:
+        for k in remove:
+            del kwargs_dict[k]
+    return size_pos_args
 
 def seconds2human(seconds,short=False):
     """

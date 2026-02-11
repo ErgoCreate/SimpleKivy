@@ -269,11 +269,18 @@ class ScrollbarMirror(Widget):
                     pos=self._update_graphics
                 )
             else:
-                scroll_view.content=scroll_view.children[0]
-                scroll_view.content.bind(
-                    size=self._update_graphics,
-                    pos=self._update_graphics
-                )
+                try:
+                    scroll_view=scroll_view.children[0]
+                    scroll_view.bind(
+                        size=self._update_graphics,
+                        pos=self._update_graphics
+                    )
+                except:
+                    scroll_view=scroll_view
+                    scroll_view.bind(
+                        size=self._update_graphics,
+                        pos=self._update_graphics
+                    )
         
         self._update_graphics()
     

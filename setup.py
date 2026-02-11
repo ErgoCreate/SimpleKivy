@@ -27,7 +27,8 @@ setuptools.setup(
     },
 
     install_requires=[
-        "kivy"
+        "kivy",
+        "psutil"
     ],
     classifiers=(
         "Programming Language :: Python :: 3",

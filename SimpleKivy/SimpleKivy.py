@@ -907,7 +907,7 @@ class action:
 
 _post_actions_global=[]
 
-if 'win' == platform.lower():
+if 'win' == platform:
     import win32gui
     import win32api
     import win32con
@@ -1437,7 +1437,7 @@ class MyApp(App):
             auto_config()
             pass
 
-        self._is_windows = True if platform.lower()=='win' else False
+        self._is_windows = True if platform=='win' else False
         self.Clock=Clock
         self.mdi=mdi
         
@@ -2547,7 +2547,8 @@ class MyApp(App):
         '''
         import tkinter as tk
         root=tk.Tk()
-        root.iconbitmap(self.ico)
+        if platform=='win':
+            root.iconbitmap(self.ico)
         root.call('wm', 'attributes', '.', '-topmost', '1')
         root.withdraw()
         from tkinter import filedialog as fd
@@ -2680,7 +2681,8 @@ class MyApp(App):
         '''
         import tkinter as tk
         root=tk.Tk()
-        root.iconbitmap(self.ico)
+        if platform=='win':
+            root.iconbitmap(self.ico)
         root.call('wm', 'attributes', '.', '-topmost', '1')
         root.withdraw()
         from tkinter import filedialog as fd
@@ -2713,10 +2715,10 @@ class MyApp(App):
         {filedialog_kw}
         '''
 
-
         import tkinter as tk
         root=tk.Tk()
-        root.iconbitmap(self.ico)
+        if platform=='win':
+            root.iconbitmap(self.ico)
         root.call('wm', 'attributes', '.', '-topmost', '1')
         root.withdraw()
         from tkinter import filedialog as fd
@@ -2727,7 +2729,6 @@ class MyApp(App):
             **kw
             )
         root.destroy()
-        # print(filename)
         if callback and filename:
             callback(filename)
         return filename
@@ -2753,7 +2754,8 @@ class MyApp(App):
         # def _do():
         import tkinter as tk
         root=tk.Tk()
-        root.iconbitmap(self.ico)
+        if platform=='win':
+            root.iconbitmap(self.ico)
         root.call('wm', 'attributes', '.', '-topmost', '1')
         root.withdraw()
         from tkinter import filedialog as fd
@@ -4577,7 +4579,7 @@ def GradientBoxitV(*widgets,gradient=["linear-gradient",dict(colors=['#0E0A0A','
     return kel
 
 @skwidget
-def Frame(title='Frame',*widgets,k=None,orientation='vertical',
+def Frame(*widgets,title='Frame',k=None,orientation='vertical',
     label_args={},
     **kwargs):
     '''
@@ -4689,8 +4691,7 @@ def Frame(title='Frame',*widgets,k=None,orientation='vertical',
                 label_args=self._update_label_args,
             )
 
-
-    kel=skivify_v2(kvWd,k=k,lcolor=lcolor)
+    kel=skivify_v2(kvWd,k=k,lcolor=lcolor,**utils.kwargs_extract_size_pos(kwargs))
 
     default_lbl_args=dict(size='y22',size_behavior='texth',padding=[6,0,6,0],pos_hint={'top':1},x=15)
     default_lbl_args.update(label_args)
@@ -6576,15 +6577,17 @@ def Image(
             def save_to_path(self,fp,format=None,**params):
                 if self.texture and fp:
                     size=self.texture.size
-                    frame=self.texture.pixels
-                    nimg=pImage.frombytes(mode='RGBA', size=size,data=frame)
                     try:
+                        frame=self.texture.pixels
+                        nimg=pImage.frombytes(mode='RGBA', size=size,data=frame)
                         nimg.save(fp,format=format,**params)
                     except OSError:
                         nimg=nimg.convert('RGB')
                         nimg.save(fp,format=format,**params)
             def save_to_path_dialog(self,filetypes=( ("PNG","*.png"), ("JPG","*.jpg"), ), defaultextension=".png", **kw):
-                self.save_to_path(get_kvApp().asksaveasfile(filetypes=filetypes,defaultextension=defaultextension, **kw))
+                _app=get_kvApp()
+                _callback=lambda filepath:_app.schedule_func_once(self.save_to_path,filepath)
+                _app.asksaveasfile(filetypes=filetypes,defaultextension=defaultextension,callback=_callback, **kw)
 
     if is_svg:
         _kvImage=kvImage
@@ -8338,7 +8341,9 @@ def Rowlist(
     cell_defaults={},
     **kwargs
     ):
-    _cell_defaults={'text':'','halign':'left','valign':'middle','shorten':True,'padding':4,'markup':True,'font_name':'segoeui.ttf'}
+    _cell_defaults={'text':'','halign':'left','valign':'middle','shorten':True,'padding':4,'markup':True,
+    # 'font_name':'segoeui.ttf'
+    }
     _cell_defaults.update(cell_defaults)
 
     _row_defaults=dict(padding=4,selectable=True,buttonbehavior=False)
@@ -8677,6 +8682,7 @@ def TreeView(tree = {
     },
 
                        indent_level=16,
+                       # root_options={"text":'Tree One'},
 
                        k=None,enable_events=False,on_event='selected_node', **kwargs
 
@@ -8706,8 +8712,9 @@ def TreeView(tree = {
                 for child_node in node['children']:
                     self.populate_tree_view(tree_node, child_node)
     
-    kel = skivify(W,tree=tree,root_options=dict(text='Tree One'),
-                      hide_root=False,
+    kel = skivify(W,tree=tree,
+                      # root_options=root_options,
+                      hide_root=True,
                       k=k,
                       enable_events=enable_events,
                       on_event=on_event,
