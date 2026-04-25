@@ -6,11 +6,11 @@ A **simplified** and **intuitive** way to build **Kivy** GUI applications, while
 
 🚀 **Check out the [Ergo Create YouTube Channel](https://www.youtube.com/@ErgoCreate) for tutorials, examples, and live coding sessions!**  
 
-### Support My Doctoral Studies in the USA 🇺🇸  
+### Please support the project!  
 
-I’m currently pursuing my doctoral studies in the USA, and your support would help me focus on research while maintaining this and other open-source projects.  
+I’m currently abroad, and your support would help me maintaining this and other open-source projects.  
 
-If you find **SimpleKivy** useful, consider donating to help fund my education and development efforts. Every contribution, no matter how small, makes a difference!  
+If you find **SimpleKivy** useful, consider donating to help fund my development efforts. Every contribution, no matter how small, makes a difference!  
 
 🌐 **Donate via:**  
 - [Patreon](https://www.patreon.com/ErgoCreate/membership)
