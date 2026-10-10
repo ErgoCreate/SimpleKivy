@@ -2,7 +2,15 @@
 
 <img align="right" height="256" src="SimpleKivy/skdata/logo/simplekivy-icon-256.png"/>
 
-A **simplified** and **intuitive** way to build **Kivy** GUI applications, while retaining the full power and flexibility of **Kivy**.  
+## Project in active development locally *for now* due to AI agents being maliciously used everywhere
+
+Sorry to anyone watching the development of this project, but I decided to take a preemptive action and delete from public access the core of the project files. The project has actually been advancing tremendously for several months, but I have not pushed the changes to GitHub yet. I have a lot to think about regarding the future of this project with the current state of AI basically stealing the effort that people put into passion projects. For this reason, I won't push the most recent updates in a platform so easily exploitable by AI agents. I have seen several stories of demo games and projects being cloned and monetized by AI agents before a full release. I never expected to make a lot of money with open-source projects (obviously), but having the credit for your effort also stolen is unacceptable. I won't wait for the same to happen to this project.
+
+If you are an open source coder like me, I advise you to read the news and think about the safeguards and necessary changes to open-source coding in the era of AI. Just think about when you asked an LLM to do something of moderate difficulty and it gave you a response with 200 lines of code. You first think to yourself "wow, AI is really smart". But why isn't it telling you "install X module from Y author and use Z function from it to solve your problem" which would take less than 30 lines of code. I made the test and, for each hundred-line response, I tried asking "this is suspiciously long, it must have come from an existing module/library, tell me what to install". You can imagine that yes, almost every time there was an active project responsible for the general idea. You should be aware who to thank, and possibly offer your support for their efforts when it comes to open-source code. What is happening is that instead of someone's work being at least promoted, it is being stolen by AI and slightly tweaked. Someone actually put effort into creating a tool, and AI is taking their work and presenting it to you without telling you the original author. ***AI is not smart, it is very good at stealing the credit of human ingenuity.***
+
+I am not outright against AI being used as a tool, but first we must solve the environmental issues caused by it, the loss of jobs without public equity, and lack of recognition of the human sources behind each response. This is the end of my rant haha.
+
+### A **simplified** and **intuitive** way to build **Kivy** GUI applications, while retaining the full power and flexibility of **Kivy**.  
 
 🚀 **Check out the [Ergo Create YouTube Channel](https://www.youtube.com/@ErgoCreate) for tutorials, examples, and live coding sessions!**  
 
