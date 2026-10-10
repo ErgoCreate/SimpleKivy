@@ -2,7 +2,7 @@
 
 <img align="right" height="256" src="SimpleKivy/skdata/logo/simplekivy-icon-256.png"/>
 
-## Project in active development locally *for now* due to AI agents being maliciously used everywhere
+# Project in active development locally *for now* due to AI agents being maliciously used everywhere
 
 Sorry to anyone watching the development of this project, but I decided to take a preemptive action and delete from public access the core of the project files. The project has actually been advancing tremendously for several months, but I have not pushed the changes to GitHub yet. I have a lot to think about regarding the future of this project with the current state of AI basically stealing the effort that people put into passion projects. For this reason, I won't push the most recent updates in a platform so easily exploitable by AI agents. I have seen several stories of demo games and projects being cloned and monetized by AI agents before a full release. I never expected to make a lot of money with open-source projects (obviously), but having the credit for your effort also stolen is unacceptable. I won't wait for the same to happen to this project.
 
